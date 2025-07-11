@@ -11,3 +11,4 @@ RDQN/result_analysis/saved_figures/
 **/results/*
 **/.venv/*
 **/result_analysis/*
+!results/.gitkeep
