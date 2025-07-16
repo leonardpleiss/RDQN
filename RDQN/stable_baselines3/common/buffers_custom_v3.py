@@ -64,7 +64,7 @@ class ReaPER(ReplayBuffer):
         self._cum_td = np.zeros(self.n_envs,)
         self.cum_tds = np.zeros((self.buffer_size, self.n_envs))
         self.sum_tds = np.zeros((self.buffer_size, self.n_envs))
-        self.init_sum_tds = np.zeros((self.buffer_size, self.n_envs))
+        # self.init_sum_tds = np.zeros((self.buffer_size, self.n_envs))
         self.td_errors = np.zeros((self.buffer_size, self.n_envs))
         self.sampling_weights = np.zeros((self.buffer_size, self.n_envs))
 
@@ -81,6 +81,10 @@ class ReaPER(ReplayBuffer):
         self.logger.info(f"{self.n_envs=}")
         self.logger.info(f"{self.device=}")
         self.counter = 0
+        self.ep_to_track = 0
+
+        self.max_batch_avg = 1e-6
+        self.curr_batch_avg = 1e-6
 
     def add(
         self,
@@ -98,7 +102,7 @@ class ReaPER(ReplayBuffer):
         # Set preliminary sums and reward ratios
         self.reward_ratios[self.pos] = 1.
         self.sum_tds[self.pos] = self._max_sum_td
-        self.init_sum_tds[self.pos] = self._max_sum_td
+        # self.init_sum_tds[self.pos] = self._max_sum_td
         
         # Add transition information
         self.td_errors[self.pos] = self._max_td
@@ -114,7 +118,7 @@ class ReaPER(ReplayBuffer):
         if done.any():
             ep_done_row_idxes, ep_done_col_idxes = np.where((self.episodes==self._current_episode) & done)
             self.sum_tds[ep_done_row_idxes, ep_done_col_idxes] = self.cum_tds[self.pos][ep_done_col_idxes]
-            self.init_sum_tds[ep_done_row_idxes, ep_done_col_idxes] = self._max_td * self._current_timestep #[self.pos][ep_done_col_idxes]
+            # self.init_sum_tds[ep_done_row_idxes, ep_done_col_idxes] = self._max_td * self._current_timestep #[self.pos][ep_done_col_idxes]
             self.calculate_sampling_weights_for_finished_runs(ep_done_row_idxes, ep_done_col_idxes)
 
         # Update tracking variables
@@ -213,6 +217,11 @@ class ReaPER(ReplayBuffer):
         row_idxes = row_idxes[unique_idx]
         col_idxes = col_idxes[unique_idx]
         reward_ratios = reward_ratios[unique_idx]
+
+
+        # Update TD batch averages
+        self.curr_batch_avg = new_td_errors.mean()
+        self.max_batch_avg = max(self.max_batch_avg, self.curr_batch_avg)
 
         # Mask relevant variables
         episodes_to_update = self.episodes[row_idxes, col_idxes]
@@ -357,13 +366,20 @@ class R_UNI(ReaPER):
 
         # Mask relevant variables
         sum_tds = self.sum_tds[batch_idxes]
-        init_sum_tds = self.init_sum_tds[batch_idxes]
         cum_tds = self.cum_tds[batch_idxes]
         subsequent_tds = sum_tds - cum_tds
-
-        max_sum_tds = np.max([sum_tds, init_sum_tds], axis=0)
         
-        reliability = (1 - (subsequent_tds / max_sum_tds)) ** self._alpha2
+        reliability = (1 - (subsequent_tds / sum_tds)) # ** self._alpha2
+
+        reliability = reliability**2 + 0.5*reliability + 0.5 # Ensure that loss can at most be doubled and at least be halfed
+
+        regularization_exponent = self.curr_batch_avg / self.max_batch_avgc
+        
+        # reliability = reliability ** regularization_exponent
+        # reliability.mean()
+
+        # print(f"{reliability.mean(), reliability.min(), reliability.max()=}")
+        # print("---")
 
         # if self.counter%500==0:
         #     print(f"{reliability.mean()=}")
@@ -502,22 +518,26 @@ class R_UNI(ReaPER):
     def update_sampling_weights(self, played_mask):
         self._max_sum_td = np.max(self.sum_tds)
 
-        # ep_mask = self.episodes == 1
-        # print(f"{self._max_td=}")
-        # print(f"{self.timesteps[ep_mask]=}")
-        # print(f"{self.cum_tds[ep_mask]=}")
-        # print(f"{self.sum_tds[ep_mask]=}")
-        # print(f"{self.init_sum_tds[ep_mask]=}")
+        # if self.ep_to_track != (self._current_episode - 1):
 
-        # sum_tds = self.sum_tds[ep_mask]
-        # cum_tds = self.cum_tds[ep_mask]
-        # subsequent_tds = sum_tds - cum_tds
-        # init_sum_tds = self.init_sum_tds[ep_mask]
+            # ep_to_track = (self._current_episode - 1)
+            # self.ep_to_track = ep_to_track
+            # ep_mask = self.episodes == ep_to_track
+            # print(f"{ep_to_track=}")
+            # print(f"{self._max_td=}")
+            # print(f"{self.timesteps[ep_mask]=}")
+            # print(f"{self.cum_tds[ep_mask]=}")
+            # print(f"{self.sum_tds[ep_mask]=}")
+            # # print(f"{self.init_sum_tds[ep_mask]=}")
 
-        # raw_reliability = (1 - (subsequent_tds / init_sum_tds))
-        # reliability = raw_reliability ** self._alpha2
-        # print(f"{subsequent_tds=}")
-        # print(f"{raw_reliability=}")
-        # print(f"{reliability=}")
-        # print("\n----\n")
+            # sum_tds = self.sum_tds[ep_mask]
+            # cum_tds = self.cum_tds[ep_mask]
+            # subsequent_tds = sum_tds - cum_tds
+            # # init_sum_tds = self.init_sum_tds[ep_mask]
 
+            # # raw_reliability = (1 - (subsequent_tds / init_sum_tds))
+            # # reliability = raw_reliability ** self._alpha2
+            # print(f"{subsequent_tds=}")
+            # print("\n----\n")
+
+            # self.ep_to_track = ep_to_track
