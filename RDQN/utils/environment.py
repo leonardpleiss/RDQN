@@ -283,7 +283,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
             eval_exploration_fraction = .001
 
         else:
-            raise ValueError("Specify either DDQN or DQN as model.")
+            raise ValueError(f"Specify either DDQN or DQN as model - currently specified: {model_name}.")
 
     elif environment_name == "BlindCliffwalk-v0":
         num_timesteps = 20_000
