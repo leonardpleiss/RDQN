@@ -33,11 +33,11 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
 
-        sys.argv.append("CartPole-v1")#['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("R_UNI")
+        sys.argv.append("LunarLander-v2")#['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
+        sys.argv.append("R_UNI_NoSumUpdate")
         sys.argv.append("RDQN")
         sys.argv.append("20")
-        sys.argv.append("0")
+        sys.argv.append("6")
 
     print(sys.argv)
 

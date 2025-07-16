@@ -246,7 +246,19 @@ class RDQN(OffPolicyAlgorithm):
 
                 reward_ratios = (abs(replay_data.rewards) / (1e-8 + abs(replay_data.rewards) + (1 - replay_data.dones) * self.gamma * abs(next_q_values))).detach().cpu().numpy().reshape(-1)
                 td_errors = current_q_values - target_q_values
+
+                
                 new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1)) + 1e-6
+
+                if self.num_timesteps > 49000:
+                    print(f"{new_td_errors=}")
+                    print(f"{current_q_values=}")
+                    print(f"{target_q_values=}")
+                    print(f"{td_errors=}")
+                    print(f"{sample_idxs=}")
+                    print("---")
+
+
                 self.replay_buffer.update_priorities(idxes=sample_idxs, new_td_errors=new_td_errors, reward_ratios=reward_ratios)
 
         # Increase update counter

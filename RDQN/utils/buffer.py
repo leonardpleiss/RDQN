@@ -29,7 +29,7 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
             "check_frequency": check_frequency,
             "use_reward_ratios": False,
             "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
+            "conservative_initial_reliabilities": True,
             "update_sums": False
     }
         

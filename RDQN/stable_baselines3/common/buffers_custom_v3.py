@@ -372,31 +372,6 @@ class R_UNI(ReaPER):
         reliability = (1 - (subsequent_tds / sum_tds)) # ** self._alpha2
 
         reliability = reliability**2 + (0.5 * reliability) + 0.5 # Ensure that loss can at most be doubled and at least be halfed
-
-        # regularization_exponent = self.curr_batch_avg / self.max_batch_avg
-        
-        # reliability = reliability ** regularization_exponent
-        # reliability.mean()
-
-        # print(f"{reliability.mean(), reliability.min(), reliability.max()=}")
-        # print("---")
-
-        # if self.counter%500==0:
-        #     print(f"{reliability.mean()=}")
-        #     print(f"{subsequent_tds.mean()=}")
-        #     print(f"{max_sum_tds.mean()=}")
-        #     print("# ================================ # ")
-
-
-        # raw_reliability = (1 - (subsequent_tds / max_sum_tds))
-        # print(f"{subsequent_tds=}")
-        # print(f"{init_sum_tds=}")
-        # print(f"{sum_tds=}")
-        # print(f"{cum_tds=}")
-        # print(f"{reliability=}")
-        # print(f"{init_sum_tds=}")
-        # print(f"{raw_reliability=}")
-
         
         if np.isnan(cum_tds).sum() > 0:
             import sys
