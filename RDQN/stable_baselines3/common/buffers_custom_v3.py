@@ -371,7 +371,7 @@ class R_UNI(ReaPER):
         
         reliability = (1 - (subsequent_tds / sum_tds)) # ** self._alpha2
 
-        reliability = reliability**2 + 0.5*reliability + 0.5 # Ensure that loss can at most be doubled and at least be halfed
+        reliability = reliability**2 + (0.5 * reliability) + 0.5 # Ensure that loss can at most be doubled and at least be halfed
 
         # regularization_exponent = self.curr_batch_avg / self.max_batch_avg
         
