@@ -24,6 +24,6 @@ def get_export_path(
 
 def get_tb_storage_file_path(environment_name, replay_buffer_class, model_name):
 
-    storage_file_path = f"./results/tensorboard_logs/{model_name}/{environment_name}/{replay_buffer_class.__name__}/"
+    storage_file_path = f"RDQN/results/tensorboard_logs/{model_name}/{environment_name}/{replay_buffer_class.__name__}/"
     return storage_file_path
 

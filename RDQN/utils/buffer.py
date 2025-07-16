@@ -19,6 +19,34 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
             "conservative_initial_reliabilities": False,
     }
         
+    elif buffer_name == "R_UNI_NoSumUpdate":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": 1.,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": False,
+            "conservative_initial_reliabilities": False,
+            "update_sums": False
+    }
+        
+    elif buffer_name == "R_UNI_r2_NoSumUpdate":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .2,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": False,
+            "conservative_initial_reliabilities": False,
+            "update_sums": False
+    }
+        
     elif buffer_name == "R_UNI_r1":
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {

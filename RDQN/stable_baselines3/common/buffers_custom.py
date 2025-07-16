@@ -514,8 +514,6 @@ class DynamicPrioritizedReplayBuffer(ReplayBuffer):
 
         self.log_path = log_path
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(filename=self.log_path + 'replay_value_prediction_model.log', encoding='utf-8', level=logging.DEBUG)
-        self.logger.info("Weight prediction model summary\n---")
 
 
     def add_transition_metric(
