@@ -270,7 +270,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
                                   momentum=0.95, # Set according to original DDQN for RL paper (van Hasselt, 2015)
                                   centered=True))
         
-        if model_name == ["DQN", "RQDN"]:
+        if model_name == ["DQN", "RDQN"]:
             print("DQN parameters loaded")
             exploration_final_eps=.1 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
             target_update_interval=10_000 # Set according to DDQN paper (van Hasselt, 2015).
