@@ -23,7 +23,7 @@ if __name__ == "__main__":
     debug_mode = False
     allow_duplicates_in_batch = True
     full_check_frequency = 1_000
-    trial_name = "1707_RDQN_02" # 1607_RDQN_02 --> div by mean, was good
+    trial_name = "tst" # 1607_RDQN_02 --> div by mean, was good
     use_sb3_standard_params = False
     RWTH_cluster = False
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
 
         sys.argv.append("LunarLander-v2") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("R_UNI_NoSumUpdate")
+        sys.argv.append("R_UNI_a11")
         sys.argv.append("RDQN")
         sys.argv.append("20")
         sys.argv.append("0")
