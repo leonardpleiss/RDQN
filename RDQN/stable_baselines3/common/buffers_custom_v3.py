@@ -371,7 +371,8 @@ class R_UNI(ReaPER):
         
         reliability = (1 - (subsequent_tds / sum_tds)) # ** self._alpha2
 
-        reliability = reliability**2 + (0.5 * reliability) + 0.5 # Ensure that loss can at most be doubled and at least be halfed
+        # reliability = reliability**2 + (0.5 * reliability) + 0.5 # Ensure that loss can at most be doubled and at least be halfed
+        reliability = self._alpha2 ** (2 * reliability - 1)
         
         if np.isnan(cum_tds).sum() > 0:
             import sys

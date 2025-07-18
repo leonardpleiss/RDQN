@@ -106,17 +106,6 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
     else:
         raise ValueError(f"Model name not supported: {model_name}")
 
-    supported_custom_environments = ["BlindCliffwalk-v0"]
-
-    # Register custom environment
-    if environment_name in supported_custom_environments:
-
-        register(
-            id=environment_name,
-            entry_point=f'gymnasium.envs.toy_text.blind_cliffwalk:BlindCliffwalkEnv',
-            max_episode_steps=500,
-        )
-
     # Set standard settings
     env = make_vec_env(environment_name, n_envs=n_envs, seed=seed)
     eval_env = make_vec_env(environment_name, n_envs=1, seed=seed)
@@ -255,7 +244,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         learning_starts = 50_000 # Not mentioned for DDQN or PER. Set according to DQN (Mnih et al., 2015)
         n_eval_episodes=1 # Set according to PER (Schaul et al, 2015) for DDQN 
         callback_on_new_best = None
-        learning_rate=0.0000625 # Set according to PER (Schaul et al, 2015) for DDQN 
+        learning_rate=0.00025 # Set according to PER (Schaul et al, 2015) for DDQN 
         exploration_initial_eps=1. # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
         exploration_fraction=.02 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
         train_freq = 4

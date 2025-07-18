@@ -23,7 +23,7 @@ if __name__ == "__main__":
     debug_mode = False
     allow_duplicates_in_batch = True
     full_check_frequency = 1_000
-    trial_name = "1607_RDQN_07" # 1607_RDQN_02 --> div by mean, was good
+    trial_name = "1707_RDQN_02" # 1607_RDQN_02 --> div by mean, was good
     use_sb3_standard_params = False
     RWTH_cluster = False
 
@@ -46,8 +46,8 @@ if __name__ == "__main__":
     else:
         environment_names = [sys.argv[1]]
 
-    environment_names = [sys.argv[1]]
-    buffer_names = [sys.argv[2]]
+    environment_names = [sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
+    buffer_names = [sys.argv[2]] # ["UNI", "R_UNI_a11"]#, "R_UNI_a125", "R_UNI_a15", "R_UNI_a2", "R_UNI_a3"] # 
     model_names = [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])

@@ -121,9 +121,10 @@ class RDDQN(DQN):
             current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
 
             # Compute Huber loss (less sensitive to outliers)
-            loss_raw = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none')
-            loss_adj = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability
-            loss = th.mean(th.min(loss_raw, loss_adj))
+            # loss_raw = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none')
+            # loss_adj = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability
+            # loss = th.mean(th.min(loss_raw, loss_adj))
+            loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability 
 
             # print(f"{loss_raw=}")
             # print(f"{loss_adj=}")
