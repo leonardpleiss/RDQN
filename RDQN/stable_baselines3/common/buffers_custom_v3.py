@@ -75,16 +75,12 @@ class ReaPER(ReplayBuffer):
         # Setup logger
         self.log_path = log_path
         self.logger = logging.getLogger(__name__)
+
         # logging.basicConfig(filename=self.log_path + 'replay_value_prediction_model.log', encoding='utf-8', level=logging.DEBUG)
         self.logger.info(f"{self.buffer_size=}")
         self.logger.info(f"{self._alpha=}")
         self.logger.info(f"{self.n_envs=}")
         self.logger.info(f"{self.device=}")
-        self.counter = 0
-        self.ep_to_track = 0
-
-        self.max_batch_avg = 1e-6
-        self.curr_batch_avg = 1e-6
 
     def add(
         self,
@@ -217,11 +213,6 @@ class ReaPER(ReplayBuffer):
         row_idxes = row_idxes[unique_idx]
         col_idxes = col_idxes[unique_idx]
         reward_ratios = reward_ratios[unique_idx]
-
-
-        # Update TD batch averages
-        self.curr_batch_avg = new_td_errors.mean()
-        self.max_batch_avg = max(self.max_batch_avg, self.curr_batch_avg)
 
         # Mask relevant variables
         episodes_to_update = self.episodes[row_idxes, col_idxes]
@@ -369,127 +360,26 @@ class R_UNI(ReaPER):
         cum_tds = self.cum_tds[batch_idxes]
         subsequent_tds = sum_tds - cum_tds
         
-        reliability = (1 - (subsequent_tds / sum_tds)) # ** self._alpha2
+
+        if self.max_sum_normalization:
+            reliability = (1 - (subsequent_tds / self._max_sum_td)) ** self._alpha2
+        else:
+            reliability = (1 - (subsequent_tds / sum_tds)) ** self._alpha2
+
+
+        # reliability = 2 ** (2 * reliability - 1)
+        # reliability * 2
+        # reliability = 2. ** (2 * reliability - 1) # Ensure that loss can at most be doubled and at least be halfed
 
         # print(reliability.min(), reliability.max(), reliability.mean())
-
         # reliability = reliability**2 + (0.5 * reliability) + 0.5 # Ensure that loss can at most be doubled and at least be halfed
-        reliability = self._alpha2 ** (2 * reliability - 1)
+        # reliability = self._alpha2 ** (2 * reliability - 1)
         # print(reliability.min(), reliability.max(), reliability.mean())
         # print("---")
-        if np.isnan(cum_tds).sum() > 0:
-            import sys
-            sys.exit()
-        encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
 
-        self.counter += 1
+        encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, encoded_sample))), reliability, (row_idxes, col_idxes)
-    """
-    def sample(self, batch_size: int, beta: float, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
-
-        upper_bound = self.buffer_size if self.full else self.pos
-        discount_factor = .99
-
-        # Sample batch indices
-        row_idxes = np.random.randint(0, upper_bound, size=batch_size)
-        col_idxes = np.random.randint(0, self.n_envs, size=batch_size)
-        batch_idxes = row_idxes, col_idxes
-
-        # Flattened metadata (shape: [N])
-        all_td_errors  = self.td_errors.squeeze(1)     # [N]
-        all_timesteps  = self.timesteps.squeeze(1)     # [N]
-        all_episodes   = self.episodes.squeeze(1)      # [N]
-
-        # Metadata for sampled batch (shape: [B])
-        sample_timesteps = all_timesteps[row_idxes]    # [B]
-        sample_episodes  = all_episodes[row_idxes]     # [B]
-
-        # Broadcast batch values to [B, N]
-        B, N = batch_size, self.buffer_size
-        batch_timesteps = sample_timesteps[:, None]    # [B, 1]
-        batch_episodes  = sample_episodes[:, None]     # [B, 1]
-        
-        all_timesteps_exp = all_timesteps[None, :]     # [1, N]
-        all_episodes_exp  = all_episodes[None, :]      # [1, N]
-        td_errors_exp     = np.abs(all_td_errors[None, :])  # [1, N]
-
-        # Mask: same episode & timestep > current
-        same_episode = (batch_episodes == all_episodes_exp)    # [B, N]
-        future_steps = (all_timesteps_exp > batch_timesteps)   # [B, N]
-        valid_mask = same_episode & future_steps
-
-        # Time deltas and decay
-        deltas = (all_timesteps_exp - batch_timesteps).clip(min=0)  # [B, N]
-        decay = np.power(discount_factor, deltas)                               # [B, N]
-
-        # Apply decay and mask
-        weighted_future_errors = valid_mask * td_errors_exp * decay # [B, N]
-        discounted_sum = np.sum(weighted_future_errors, axis=1)     # [B]
-
-        # Compute reliability
-        reliability = 1.0 / (1.0 + discounted_sum)                   # [B]
-        # reliability = th.from_numpy(reliability).float()         # [B]
-
-        # Get sampled transitions
-        # encoded_sample = super()._get_samples(row_idxes, env=env)
-        encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
-
-        return ReplayBufferSamples(*tuple(map(self.to_torch, encoded_sample))), reliability, batch_idxes
-    
-    def sample(self, batch_size: int, beta: float, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
-        upper_bound = self.buffer_size if self.full else self.pos
-        discount_factor = 0.99
-        max_horizon = 700  # Based on gamma^h < 0.001
-
-        # Sample batch indices
-        row_idxes = np.random.randint(0, upper_bound - max_horizon, size=batch_size)
-        col_idxes = np.zeros(batch_size, dtype=int)  # single env
-        batch_idxes = row_idxes, col_idxes
-
-        # Buffer metadata
-        td_errors = self.td_errors.squeeze(1)         # [N]
-        timesteps = self.timesteps.squeeze(1)         # [N]
-        episodes = self.episodes.squeeze(1)           # [N]
-
-        # Sampled batch metadata
-        sample_episodes = episodes[row_idxes]         # [B]
-        sample_timesteps = timesteps[row_idxes]       # [B]
-
-        # Create indices into future horizon for each sample
-        lookahead = np.arange(1, max_horizon + 1)     # [H]
-        future_idx = row_idxes[:, None] + lookahead   # [B, H]
-
-        # Clip to stay in buffer
-        np.clip(future_idx, 0, upper_bound - 1, out=future_idx)
-
-        # Gather future metadata [B, H]
-        future_td = np.abs(td_errors[future_idx])               # [B, H]
-        future_ts = timesteps[future_idx]                       # [B, H]
-        future_ep = episodes[future_idx]                        # [B, H]
-
-        # Compute masks: same episode and truly in future
-        same_ep_mask = future_ep == sample_episodes[:, None]    # [B, H]
-        time_increasing = future_ts > sample_timesteps[:, None] # [B, H]
-        valid = same_ep_mask & time_increasing
-
-        # Compute deltas and decay
-        deltas = (future_ts - sample_timesteps[:, None]) * valid
-        decay = discount_factor ** deltas
-
-        # Weighted sum of future TD errors
-        weighted_sum = np.sum(future_td * decay * valid, axis=1)  # [B]
-
-        # Final reliability
-        reliability = (1.0 / (1.0 + weighted_sum)) ** self._alpha2
-
-        # print(reliability)
-        # reliability = th.from_numpy(reliability).float()
-
-        # Final sample
-        encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
-        return ReplayBufferSamples(*tuple(map(self.to_torch, encoded_sample))), reliability, batch_idxes
-    """
     
     def calculate_sampling_weights_for_finished_runs(self, ep_done_row_idxes, ep_done_col_idxes):
         self._max_sum_td = max(self._max_sum_td, np.max(self.sum_tds[ep_done_row_idxes, ep_done_col_idxes]))

@@ -215,9 +215,9 @@ class RDQN(OffPolicyAlgorithm):
 
             with th.no_grad():
                 # Compute the next Q-values using the target network
-                next_q_values = self.q_net_target(replay_data.next_observations)
+                all_next_q_values = self.q_net_target(replay_data.next_observations)
                 # Follow greedy policy: use the one with the highest value
-                next_q_values, _ = next_q_values.max(dim=1)
+                next_q_values, _ = all_next_q_values.max(dim=1)
                 # Avoid potential broadcast issue
                 next_q_values = next_q_values.reshape(-1, 1)
 
@@ -225,13 +225,35 @@ class RDQN(OffPolicyAlgorithm):
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
                 # Adjust target with reliability
-                # target_q_values_adj =  (target_q_values * reliability) + current_q_values * (1-reliability) 
+                # print(next_q_values)
+                # print(th.mean(next_q_values))
+                # print("---")
 
+                # avg_next_q_values = all_next_q_values.mean(dim=1).reshape(-1, 1)
+                # target_q_values_adj =  (target_q_values * reliability) + avg_next_q_values * (1-reliability) 
+
+                # final_target_q_values = th.minimum(target_q_values_adj, target_q_values)
+
+                # print(f"{all_next_q_values.shape=}")
+                # print(f"{next_q_values.shape=}")
+                # print(f"{avg_next_q_values.shape=}")
+                # print(f"{target_q_values_adj.shape=}")
+
+                # print(f"{target_q_values=}")
+                # print(f"{target_q_values_adj=}")
+                # print(f"{final_target_q_values=}")
+
+                # print(target_q_values)
             # Compute Huber loss (less sensitive to outliers)
             loss_raw = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none')
             loss_adj = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability
-            loss = th.mean(th.min(loss_raw, loss_adj))
+            min_loss = th.minimum(loss_raw, loss_adj)
 
+            loss = th.mean(min_loss)
+
+            # loss = th.mean(F.smooth_l1_loss(current_q_values, target_q_values, reduce=None) * reliability)
+
+            # loss = th.mean(F.smooth_l1_loss(current_q_values, target_q_values) * reliability)
             losses.append(loss.item())
 
             # Optimize the policy

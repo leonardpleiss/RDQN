@@ -6,38 +6,11 @@ from stable_baselines3.common.buffers_custom_v3 import ReaPER, R_UNI
 
 def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_000):
 
-    
-    if buffer_name == "R_UNI_a11":
+    if buffer_name == "R_UNI_a1":
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {
             "alpha": 1.,
-            "alpha2": 1.1,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": True,
-    }
-        
-    elif buffer_name == "R_UNI_a125":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": 1.25,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": True,
-    }
-
-    elif buffer_name == "R_UNI_a15":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": 1.5,
+            "alpha2": .1,
             "debug_mode": debug_mode,
             "handle_timeout_termination": False,
             "check_frequency": check_frequency,
@@ -50,7 +23,7 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {
             "alpha": 1.,
-            "alpha2": 2.,
+            "alpha2": .2,
             "debug_mode": debug_mode,
             "handle_timeout_termination": False,
             "check_frequency": check_frequency,
@@ -63,7 +36,7 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {
             "alpha": 1.,
-            "alpha2": 3.,
+            "alpha2": .3,
             "debug_mode": debug_mode,
             "handle_timeout_termination": False,
             "check_frequency": check_frequency,
@@ -72,113 +45,7 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
             "conservative_initial_reliabilities": True,
     }
         
-    elif buffer_name == "R_UNI_NoSumUpdate":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": 1.,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": True,
-            "update_sums": False
-    }
-        
-    elif buffer_name == "R_UNI_r2_NoSumUpdate":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .2,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-            "update_sums": False
-    }
-        
-    elif buffer_name == "R_UNI_r1":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .1,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-        
-    elif buffer_name == "R_UNI_r1_RR":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .1,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": True,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-        
-    elif buffer_name == "R_UNI_r2":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .2,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-
-    elif buffer_name == "R_UNI_r2_RR":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .2,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": True,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-        
-    elif buffer_name == "R_UNI_r3":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .3,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": False,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-            
-    elif buffer_name == "R_UNI_r3_RR":
-        replay_buffer_class = R_UNI
-        replay_buffer_kwargs = {
-            "alpha": 1.,
-            "alpha2": .3,
-            "debug_mode": debug_mode,
-            "handle_timeout_termination": False,
-            "check_frequency": check_frequency,
-            "use_reward_ratios": True,
-            "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
-    }
-        
-    elif buffer_name == "R_UNI_r4":
+    elif buffer_name == "R_UNI_a4":
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {
             "alpha": 1.,
@@ -188,10 +55,10 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
             "check_frequency": check_frequency,
             "use_reward_ratios": False,
             "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
+            "conservative_initial_reliabilities": True,
     }
         
-    elif buffer_name == "R_UNI_r5":
+    elif buffer_name == "R_UNI_a5":
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {
             "alpha": 1.,
@@ -201,7 +68,73 @@ def get_replay_buffer_config(buffer_name, debug_mode=True, check_frequency=100_0
             "check_frequency": check_frequency,
             "use_reward_ratios": False,
             "max_sum_normalization": False,
-            "conservative_initial_reliabilities": False,
+            "conservative_initial_reliabilities": True,
+    }
+        
+    
+    elif buffer_name == "R_UNI_a1_mSN":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .1,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": True,
+            "conservative_initial_reliabilities": True,
+    }
+        
+    elif buffer_name == "R_UNI_a2_mSN":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .2,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": True,
+            "conservative_initial_reliabilities": True,
+    }
+        
+    elif buffer_name == "R_UNI_a3_mSN":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .3,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": True,
+            "conservative_initial_reliabilities": True,
+    }
+        
+    elif buffer_name == "R_UNI_a4_mSN":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .4,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": True,
+            "conservative_initial_reliabilities": True,
+    }
+        
+    elif buffer_name == "R_UNI_a5_mSN":
+        replay_buffer_class = R_UNI
+        replay_buffer_kwargs = {
+            "alpha": 1.,
+            "alpha2": .5,
+            "debug_mode": debug_mode,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+            "use_reward_ratios": False,
+            "max_sum_normalization": True,
+            "conservative_initial_reliabilities": True,
     }
                 
     elif buffer_name == "UNI":

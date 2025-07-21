@@ -23,7 +23,7 @@ if __name__ == "__main__":
     debug_mode = False
     allow_duplicates_in_batch = True
     full_check_frequency = 1_000
-    trial_name = "BASELINES" # 1607_RDQN_02 --> div by mean, was good
+    trial_name = "1807_RDQN_BIG_TRIAL" # 1607_RDQN_02 --> div by mean, was good
     use_sb3_standard_params = False
     RWTH_cluster = False
 
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
 
         sys.argv.append("LunarLander-v2") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("UNI")
+        sys.argv.append("R_UNI_a3")
         sys.argv.append("RDQN")
         sys.argv.append("20")
         sys.argv.append("0")
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         environment_names = [sys.argv[1]]
 
     environment_names = ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
-    buffer_names = ["UNI"] #, "R_UNI_a125", "R_UNI_a15", "R_UNI_a2", "R_UNI_a3"] # 
+    buffer_names = ["R_UNI_a1_mSN", "R_UNI_a2_mSN", "R_UNI_a3_mSN", "R_UNI_a4_mSN", "R_UNI_a5_mSN", "R_UNI_a1", "R_UNI_a2", "R_UNI_a3", "R_UNI_a4", "R_UNI_a5"] # ["R_UNI_a3"] #, "R_UNI_a125", "R_UNI_a15", "R_UNI_a2", "R_UNI_a3"] # 
     model_names = [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
