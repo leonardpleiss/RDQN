@@ -37,9 +37,9 @@ if __name__ == "__main__":
 
     print(sys.argv)
 
-    environment_names = ["CartPole-v1", "Acrobot-v1"] #[sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
+    environment_names = [sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = ["DQN", "DDQN"]# [sys.argv[3]]
+    model_names = [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
