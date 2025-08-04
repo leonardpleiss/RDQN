@@ -20,7 +20,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "0408_T01" # "2207_LL_1eval_v5"
+    trial_name = "0408_T02" # "2207_LL_1eval_v5"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -37,9 +37,9 @@ if __name__ == "__main__":
 
     print(sys.argv)
 
-    environment_names = [sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
+    environment_names = ["CartPole-v1", "Acrobot-v1"] #[sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]]
+    model_names = ["DQN", "DDQN"]# [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
@@ -54,8 +54,11 @@ if __name__ == "__main__":
             for buffer_name in buffer_names:
                 for model_name in model_names:
                     for to_scale_with_reliability in to_scale_with_reliability_options:
-                        print(f"seed: {iteration}")
 
+                        if model_name in ["DDQN", "DQN"]:
+                            buffer_name = "UNI"
+
+                        print(f"seed: {iteration}")
                         seed_everything(iteration)
 
                         replay_buffer_class, replay_buffer_kwargs = get_replay_buffer_config(buffer_name=buffer_name)
@@ -101,7 +104,7 @@ if __name__ == "__main__":
                             target_update_interval=target_update_interval,
                             gradient_steps=gradient_steps,
                             gamma=gamma,
-                            to_scale_with_reliability=to_scale_with_reliability,
+                            # to_scale_with_reliability=to_scale_with_reliability,
 
                             # Tensorboard settings
                             tensorboard_log = tb_log_path + export_suffix + "/",

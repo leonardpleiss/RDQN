@@ -498,6 +498,97 @@ class RDQN(OffPolicyAlgorithm):
         return state_dicts, []
     
     
+    # def _store_transition(
+    #     self,
+    #     replay_buffer: ReplayBuffer,
+    #     buffer_action: np.ndarray,
+    #     new_obs: Union[np.ndarray, Dict[str, np.ndarray]],
+    #     reward: np.ndarray,
+    #     dones: np.ndarray,
+    #     infos: List[Dict[str, Any]],
+    # ) -> None:
+    #     """
+    #     Store transition in the replay buffer.
+    #     We store the normalized action and the unnormalized observation.
+    #     It also handles terminal observations (because VecEnv resets automatically).
+
+    #     :param replay_buffer: Replay buffer object where to store the transition.
+    #     :param buffer_action: normalized action
+    #     :param new_obs: next observation in the current episode
+    #         or first observation of the episode (when dones is True)
+    #     :param reward: reward for the current transition
+    #     :param dones: Termination signal
+    #     :param infos: List of additional information about the transition.
+    #         It may contain the terminal observations and information about timeout.
+    #     """
+    #     # Store only the unnormalized version
+    #     if self._vec_normalize_env is not None:
+    #         new_obs_ = self._vec_normalize_env.get_original_obs()
+    #         reward_ = self._vec_normalize_env.get_original_reward()
+    #     else:
+    #         # Avoid changing the original ones
+    #         self._last_original_obs, new_obs_, reward_ = self._last_obs, new_obs, reward
+
+    #     # Avoid modification by reference
+    #     next_obs = deepcopy(new_obs_)
+    #     # As the VecEnv resets automatically, new_obs is already the
+    #     # first observation of the next episode
+    #     for i, done in enumerate(dones):
+    #         if done and infos[i].get("terminal_observation") is not None:
+    #             if isinstance(next_obs, dict):
+    #                 next_obs_ = infos[i]["terminal_observation"]
+    #                 # VecNormalize normalizes the terminal observation
+    #                 if self._vec_normalize_env is not None:
+    #                     next_obs_ = self._vec_normalize_env.unnormalize_obs(next_obs_)
+    #                 # Replace next obs for the correct envs
+    #                 for key in next_obs.keys():
+    #                     next_obs[key][i] = next_obs_[key]
+    #             else:
+    #                 next_obs[i] = infos[i]["terminal_observation"]
+    #                 # VecNormalize normalizes the terminal observation
+    #                 if self._vec_normalize_env is not None:
+    #                     next_obs[i] = self._vec_normalize_env.unnormalize_obs(next_obs[i, :])
+
+    #     # print(f"{self._last_original_obs=}")
+    #     # print(f"{th.from_numpy(self._last_original_obs)=}")
+    #     # print(f"{th.from_numpy(buffer_action)=}")
+    #     current_q_values = self.q_net(th.from_numpy(self._last_original_obs))
+    #     current_q_values = th.gather(current_q_values, dim=1, index=th.from_numpy(buffer_action).unsqueeze(1))
+
+    #     # print(f"{th.from_numpy(next_obs)=}")
+
+    #     with th.no_grad():
+    #         # Compute the next Q-values using the target network
+    #         all_next_q_values = self.q_net_target(th.from_numpy(next_obs))
+
+    #         # Follow greedy policy: use the one with the highest value
+    #         next_q_values, _ = all_next_q_values.max(dim=1)
+    #         # Avoid potential broadcast issue
+    #         next_q_values = next_q_values.reshape(-1, 1)
+
+    #         # 1-step TD target
+    #         target_q_values = th.from_numpy(reward_) + (1 - th.from_numpy(dones).float()) * self.gamma * next_q_values
+
+    #     td_errors = current_q_values - target_q_values
+    #     new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1))
+
+    #     replay_buffer.add(
+    #         self._last_original_obs,  # type: ignore[arg-type]
+    #         next_obs,  # type: ignore[arg-type]
+    #         buffer_action,
+    #         reward_,
+    #         dones,
+    #         infos,
+    #         new_td_errors,
+    #     )
+
+    #     self.max_reward = max(self.max_reward, reward_)
+
+    #     self._last_obs = new_obs
+    #     # Save the unnormalized observation
+    #     if self._vec_normalize_env is not None:
+    #         self._last_original_obs = new_obs_
+
     def _store_transition(
         self,
         replay_buffer: ReplayBuffer,
@@ -507,74 +598,49 @@ class RDQN(OffPolicyAlgorithm):
         dones: np.ndarray,
         infos: List[Dict[str, Any]],
     ) -> None:
-        """
-        Store transition in the replay buffer.
-        We store the normalized action and the unnormalized observation.
-        It also handles terminal observations (because VecEnv resets automatically).
-
-        :param replay_buffer: Replay buffer object where to store the transition.
-        :param buffer_action: normalized action
-        :param new_obs: next observation in the current episode
-            or first observation of the episode (when dones is True)
-        :param reward: reward for the current transition
-        :param dones: Termination signal
-        :param infos: List of additional information about the transition.
-            It may contain the terminal observations and information about timeout.
-        """
-        # Store only the unnormalized version
         if self._vec_normalize_env is not None:
             new_obs_ = self._vec_normalize_env.get_original_obs()
             reward_ = self._vec_normalize_env.get_original_reward()
         else:
-            # Avoid changing the original ones
             self._last_original_obs, new_obs_, reward_ = self._last_obs, new_obs, reward
 
-        # Avoid modification by reference
         next_obs = deepcopy(new_obs_)
-        # As the VecEnv resets automatically, new_obs is already the
-        # first observation of the next episode
         for i, done in enumerate(dones):
             if done and infos[i].get("terminal_observation") is not None:
                 if isinstance(next_obs, dict):
                     next_obs_ = infos[i]["terminal_observation"]
-                    # VecNormalize normalizes the terminal observation
                     if self._vec_normalize_env is not None:
                         next_obs_ = self._vec_normalize_env.unnormalize_obs(next_obs_)
-                    # Replace next obs for the correct envs
                     for key in next_obs.keys():
                         next_obs[key][i] = next_obs_[key]
                 else:
                     next_obs[i] = infos[i]["terminal_observation"]
-                    # VecNormalize normalizes the terminal observation
                     if self._vec_normalize_env is not None:
                         next_obs[i] = self._vec_normalize_env.unnormalize_obs(next_obs[i, :])
 
-        # print(f"{self._last_original_obs=}")
-        # print(f"{th.from_numpy(self._last_original_obs)=}")
-        # print(f"{th.from_numpy(buffer_action)=}")
-        current_q_values = self.q_net(th.from_numpy(self._last_original_obs))
-        current_q_values = th.gather(current_q_values, dim=1, index=th.from_numpy(buffer_action).unsqueeze(1))
+        # Convert everything to tensors on the right device
+        obs_tensor = th.from_numpy(self._last_original_obs).float().to(self.device)
+        action_tensor = th.from_numpy(buffer_action).long().to(self.device)
 
-        # print(f"{th.from_numpy(next_obs)=}")
+        current_q_values = self.q_net(obs_tensor)
+        current_q_values = th.gather(current_q_values, dim=1, index=action_tensor.unsqueeze(1))
 
         with th.no_grad():
-            # Compute the next Q-values using the target network
-            all_next_q_values = self.q_net_target(th.from_numpy(next_obs))
-
-            # Follow greedy policy: use the one with the highest value
+            next_obs_tensor = th.from_numpy(next_obs).float().to(self.device)
+            all_next_q_values = self.q_net_target(next_obs_tensor)
             next_q_values, _ = all_next_q_values.max(dim=1)
-            # Avoid potential broadcast issue
             next_q_values = next_q_values.reshape(-1, 1)
 
-            # 1-step TD target
-            target_q_values = th.from_numpy(reward_) + (1 - th.from_numpy(dones).float()) * self.gamma * next_q_values
+            reward_tensor = th.from_numpy(reward_).float().to(self.device)
+            dones_tensor = th.from_numpy(dones).float().to(self.device)
+            target_q_values = reward_tensor + (1 - dones_tensor) * self.gamma * next_q_values
 
         td_errors = current_q_values - target_q_values
         new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1))
 
         replay_buffer.add(
-            self._last_original_obs,  # type: ignore[arg-type]
-            next_obs,  # type: ignore[arg-type]
+            self._last_original_obs,  # still numpy
+            next_obs,                 # still numpy
             buffer_action,
             reward_,
             dones,
@@ -585,6 +651,5 @@ class RDQN(OffPolicyAlgorithm):
         self.max_reward = max(self.max_reward, reward_)
 
         self._last_obs = new_obs
-        # Save the unnormalized observation
         if self._vec_normalize_env is not None:
             self._last_original_obs = new_obs_
