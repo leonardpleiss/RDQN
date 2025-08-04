@@ -9,7 +9,7 @@ from torch.nn import functional as F
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.buffers_custom import PrioritizedReplayBuffer, CustomPrioritizedReplayBuffer, PrioritizedReplayBufferPropagating
 from stable_baselines3.common.buffers_custom_v2 import CustomPrioritizedReplayBufferCumSum, CustomPrioritizedReplayBufferCumSumProp, CustomPrioritizedReplayBufferCumSum2, CustomPrioritizedReplayBufferCumSum3, CustomPrioritizedReplayBufferCumSum4, CustomPrioritizedReplayBufferCumSum5, CustomPropagatingPrioritizedReplayBuffer, CustomPropagatingPrioritizedReplayBufferCumSum, CustomPrioritizedReplayBufferCumSum6, CustomPrioritizedReplayBufferCumSum7
-from stable_baselines3.common.buffers_custom_v3 import ReaPER
+
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
@@ -84,7 +84,7 @@ class DDQN(DQN):
         self._update_learning_rate(self.policy.optimizer)
         
         losses = []
-        for _ in range(gradient_steps):
+        for gradient_step in range(gradient_steps):
 
             if self.replay_buffer_class.__name__ in ["RaPPER", "PrioritizedReplayBuffer", "CustomPropagatingPrioritizedReplayBuffer", "PrioritizedReplayBufferPropagating", "CustomPrioritizedReplayBufferCumSumProp", "DynamicPrioritizedReplayBuffer", "CustomPrioritizedReplayBuffer", "CustomPrioritizedReplayBufferCumSum", "CustomPrioritizedReplayBufferCumSum2", "CustomPrioritizedReplayBufferCumSum3", "CustomPrioritizedReplayBufferCumSum4", "CustomPrioritizedReplayBufferCumSum5", "DynamicPrioritizedReplayBuffer", "CustomPrioritizedReplayBufferCumSumWithTDProp", "CustomPropagatingPrioritizedReplayBufferCumSum", "CustomPrioritizedReplayBufferCumSum5", "CustomPrioritizedReplayBufferCumSum6", "CustomPrioritizedReplayBufferCumSum7", "ReaPER"]:
                 start_beta = .4

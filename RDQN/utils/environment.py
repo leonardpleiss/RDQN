@@ -95,6 +95,8 @@ def seed_everything(seed:int):
 
 def get_environment_specific_settings(model_name, environment_name, n_envs:int=1, seed:int=0, use_sb3_standard_params=False):
 
+    assert n_envs == 1
+
     if model_name == "DQN":
         model_class = DQN
     elif model_name == "DDQN":
@@ -187,6 +189,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
             exploration_final_eps = 0.1
             policy_kwargs = dict(net_arch=[256, 256])
             num_evals = 100
+            n_eval_episodes = 1
 
     elif environment_name == "MountainCar-v0":
         
@@ -244,7 +247,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         learning_starts = 50_000 # Not mentioned for DDQN or PER. Set according to DQN (Mnih et al., 2015)
         n_eval_episodes=1 # Set according to PER (Schaul et al, 2015) for DDQN 
         callback_on_new_best = None
-        learning_rate=0.00025 # Set according to PER (Schaul et al, 2015) for DDQN 
+        learning_rate=0.00025 # For PER, set to 0.00025 / 4 (Schaul et al, 2015) for DDQN 
         exploration_initial_eps=1. # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
         exploration_fraction=.02 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
         train_freq = 4
@@ -263,7 +266,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
             print("DQN parameters loaded")
             exploration_final_eps=.1 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
             target_update_interval=10_000 # Set according to DDQN paper (van Hasselt, 2015).
-            eval_exploration_fraction = .01
+            eval_exploration_fraction = .05
 
         elif model_name in ["DDQN", "RDDQN"]:
             print("DDQN parameters loaded")
