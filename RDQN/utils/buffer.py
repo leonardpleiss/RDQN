@@ -2,10 +2,19 @@ from stable_baselines3.common.buffers_custom_v2 import CustomPrioritizedReplayBu
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.buffers_custom import PrioritizedReplayBuffer, PrioritizedReplayBufferPropagating
 from stable_baselines3.common.buffers_custom_v3 import R_UNI
+from stable_baselines3.common.buffers_custom_v4 import DR_UNI
 
 
 def get_replay_buffer_config(buffer_name, check_frequency=100_000):
 
+    if buffer_name == "DR_UNI_a10":
+        replay_buffer_class = DR_UNI
+        replay_buffer_kwargs = {
+            "alpha2": 1.,
+            "handle_timeout_termination": False,
+            "check_frequency": check_frequency,
+    }
+        
     if buffer_name == "R_UNI_a10":
         replay_buffer_class = R_UNI
         replay_buffer_kwargs = {

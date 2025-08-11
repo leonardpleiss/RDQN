@@ -7,8 +7,6 @@ from gymnasium import spaces
 from torch.nn import functional as F
 
 from stable_baselines3.common.buffers import ReplayBuffer
-from stable_baselines3.common.buffers_custom import PrioritizedReplayBuffer, CustomPrioritizedReplayBuffer, PrioritizedReplayBufferPropagating
-from stable_baselines3.common.buffers_custom_v2 import CustomPrioritizedReplayBufferCumSum, CustomPrioritizedReplayBufferCumSumProp, CustomPrioritizedReplayBufferCumSum2, CustomPrioritizedReplayBufferCumSum3, CustomPrioritizedReplayBufferCumSum4
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
@@ -16,8 +14,98 @@ from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name
 from stable_baselines3.dqn.policies import CnnPolicy, DQNPolicy, MlpPolicy, MultiInputPolicy, QNetwork
 
 from copy import deepcopy
+from collections import deque
+
+th.autograd.set_detect_anomaly(True)
 
 SelfDQN = TypeVar("SelfDQN", bound="RDQN")
+
+def find_capped_softmax_boost_stable(row_vector, index, percentage):
+    """
+    Finds the value 'a' to add to a specific element of each row vector
+    to increase its softmax probability by a given percentage, with a cap.
+    The implementation includes numerical stability for large input values.
+
+    Args:
+        row_vector (th.Tensor): A tensor of shape (batch_size, num_features).
+        index (th.Tensor): A tensor of shape (batch_size, 1) with the
+                              index to modify for each row.
+        percentage (th.Tensor): A tensor of shape (batch_size, 1) with the
+                                   desired percentage increase for each row.
+
+    Returns:
+        th.Tensor: A tensor of shape (batch_size, 1) containing the value 'a'.
+    """
+
+    # 1. Apply numerical stability trick for softmax and apply softmax
+    row_max = th.max(row_vector, dim=1, keepdim=True)[0]
+    stable_row_vector = row_vector - row_max
+    exp_stable_row_vector = th.exp(stable_row_vector)
+
+    N = th.sum(exp_stable_row_vector, dim=1, keepdim=True)
+    
+    # Use th.gather to get the exponential of the element at the index
+    exp_xi = th.gather(exp_stable_row_vector, dim=1, index=index)
+    S_orig = exp_xi / N
+
+    # Identify cases where S_orig is already effectively 1.0
+    # In these cases, no further boost is possible, so 'a' should be 0.
+    # Use a small threshold for numerical stability.
+    # is_S_orig_one = (S_orig >= (1.0 - 1e-7)).squeeze(1) # Boolean tensor (batch_size,)
+    will_exceed_1 = (S_orig >= 1 - percentage).squeeze(1)
+
+    # 3. Calculate the capped increase
+    requested_increase = percentage * S_orig
+    max_increase_possible = 1.0 - S_orig
+    actual_increase = th.min(requested_increase, max_increase_possible)
+    
+    # 4. Calculate the new target softmax probability
+    S_new_target = S_orig + actual_increase
+    
+    # Ensure S_new_target does not become exactly 1 to avoid division by zero
+    # Also ensure it's not less than a small positive value
+    epsilon_clamp_lower = 1e-9
+    epsilon_clamp_upper = 1e-9
+    S_new_target = th.clamp(S_new_target, min=epsilon_clamp_lower, max=1.0-epsilon_clamp_upper)
+
+    # 5. Use the closed-form solution
+    # D = sum(e^x_k) for k != i (using stable vectors)
+    D = N - exp_xi
+    # E_i = e^x_i (using stable vectors)
+    E_i = exp_xi
+
+    # Add a small epsilon for numerical stability in division and logarithm.
+    # This helps prevent log(0) and division by zero when D or (1 - S_new_target) are near zero.
+    epsilon_numerical = 1e-10 # A very small positive number
+    
+    # Add epsilon to D to ensure numerator is not exactly zero when D is zero
+    numerator_for_log = S_new_target * (D + epsilon_numerical)
+
+    # Add epsilon to (1.0 - S_new_target) to ensure denominator is not exactly zero
+    denominator_for_log = E_i * (1.0 - S_new_target + epsilon_numerical)
+
+    # Ensure the denominator is strictly positive
+    denominator_for_log = th.max(denominator_for_log, th.tensor(epsilon_numerical, device=row_vector.device))
+
+    fraction_term = numerator_for_log / denominator_for_log
+
+    # Ensure fraction_term is strictly positive before taking log
+    # This is a final safeguard against any floating point issues leading to non-positive value
+    fraction_term = th.max(fraction_term, th.tensor(epsilon_numerical, device=row_vector.device))
+    a = th.log(fraction_term)
+
+    # If S_orig was effectively 1, set 'a' to 0 as no boost is possible.
+    # This overrides the potentially problematic log calculation for these edge cases.
+    # Unsqueeze is_S_orig_one to match 'a's dimensions (batch_size, 1)
+    # a = th.where(is_S_orig_one.unsqueeze(1), th.zeros_like(a), a)
+    # a = th.where(will_exceed_1.unsqueeze(1), th.zeros_like(a), a)
+
+    inf_vector = th.full_like(a, float('inf'))
+
+    a = th.where(will_exceed_1.unsqueeze(1), inf_vector, a)
+
+    return a
+
 
 class RDQN(OffPolicyAlgorithm):
     """
@@ -132,6 +220,8 @@ class RDQN(OffPolicyAlgorithm):
             support_multi_env=True,
         )
 
+        self.stored_q_values = deque(maxlen=10_000)
+
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction
@@ -142,11 +232,15 @@ class RDQN(OffPolicyAlgorithm):
         # "epsilon" for the epsilon-greedy exploration
         self.exploration_rate = 0.0
 
-        assert to_scale_with_reliability in ["scaled_bootstrap", "ddqn_blend", "logsumexp", "hardsoft", "loss", "loss_2", "target", "clip", "clip2", "limit_target_mean_deviation", "weighted_avg", "clip_target_historically"]
+        assert to_scale_with_reliability in ["ddqn_blend_inv_v2", "ddqn_blend_inv_v3", "ddqn_blend_inv_v4", "importance_sampling4", "importance_sampling3", "importance_sampling2", "importance_sampling", "bootstrap_increase_scaling", "clip_max_discounted_return", "loss_scaling_floored", "range_based_clip", "max_softmax_ratio", "scaledown_with_threshold", "clipped_bootstrap","ddqn_blend_inv", "scaled_bootstrap2", "scaled_bootstrap", "ddqn_blend", "logsumexp", "hardsoft", "loss", "loss_2", "target", "clip", "clip2", "limit_target_mean_deviation", "weighted_avg", "clip_target_historically"]
         self.to_scale_with_reliability = to_scale_with_reliability
 
-        # self.max_subsequent_tds = 0.
+        self.max_bootstrap_increase = 0.
+
+        self.max_subsequent_tds = 0.
         self.max_reward = 0.
+
+        self.weight_history = []
 
         if _init_setup_model:
             self._setup_model()
@@ -206,8 +300,12 @@ class RDQN(OffPolicyAlgorithm):
         for gradient_step in range(gradient_steps):
 
             if self.replay_buffer_class.__name__ in ["R_UNI"]:
-                # replay_data, reliability, sample_idxs, max_ep_return, mean_ep_return = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
                 replay_data, reliability, sample_idxs, max_td, subsequent_tds = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+                reliability = th.from_numpy(reliability).to(self.device).unsqueeze(1).float()
+                subsequent_tds = th.from_numpy(subsequent_tds).to(self.device).unsqueeze(1).float()
+
+            elif self.replay_buffer_class.__name__ in ["DR_UNI"]:
+                replay_data, reliability, sample_idxs, max_discounted_return, subsequent_tds = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env, discount_factor=self.gamma)
                 reliability = th.from_numpy(reliability).to(self.device).unsqueeze(1).float()
                 subsequent_tds = th.from_numpy(subsequent_tds).to(self.device).unsqueeze(1).float()
                 
@@ -219,53 +317,401 @@ class RDQN(OffPolicyAlgorithm):
                 raise ValueError(f"Unknown buffer specified: {self.replay_buffer_class.__name__}")
             
             # Get current Q-values estimates
-            current_q_values = self.q_net(replay_data.observations)
+            all_current_q_values = self.q_net(replay_data.observations)
 
             # Retrieve the q-values for the actions from the replay buffer
-            current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+            current_q_values = th.gather(all_current_q_values, dim=1, index=replay_data.actions.long())
 
             with th.no_grad():
                 # Compute the next Q-values using the target network
                 all_next_q_values = self.q_net_target(replay_data.next_observations)
+
                 # Follow greedy policy: use the one with the highest value
                 next_q_values, _ = all_next_q_values.max(dim=1)
+
                 # Avoid potential broadcast issue
                 next_q_values = next_q_values.reshape(-1, 1)
 
                 # 1-step TD target
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
+            if self.to_scale_with_reliability == "range_based_clip":
+                
+                next_q = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_q = current_q_values
+                reward = replay_data.rewards
+
+                # Split error into reward-error and bootstrap-error
+                td_error = next_q + reward - current_q
+                reward_error = th.maximum(th.zeros_like(current_q), reward - current_q)
+                bootstrap_error = td_error - reward_error
+
+                # Clip bootstrapped error if positive
+                max_bootstrap_error = ((th.max(all_current_q_values, dim=1)[0] - th.min(all_current_q_values, dim=1)[0]) * 2).unsqueeze(1)
+
+                # print(f"{max_bootstrap_error.size()=}")
+                upper_limit = max_bootstrap_error # * floored_reliability
+                clipped_bootstrap_error = th.clamp(bootstrap_error, max=upper_limit)
+
+                adj_bootstrap_error = th.minimum(clipped_bootstrap_error, bootstrap_error)
+                adj_target_q_values = current_q + reward_error + adj_bootstrap_error
+
+                
+                mask = adj_bootstrap_error != bootstrap_error
+                print(f"{mask.sum() / len(mask)=}")
+                print(f"{max_bootstrap_error[mask]=}")
+                print(f"{bootstrap_error[mask]=}")
+                print(f"{clipped_bootstrap_error[mask]=}")
+                print("---")
+
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none')
+
+            if self.to_scale_with_reliability == "max_softmax_ratio":
+                
+                next_q = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_q = current_q_values
+                reward = replay_data.rewards
+
+                # Split error into reward-error and bootstrap-error
+                td_error = next_q + reward - current_q
+                reward_error = th.maximum(th.zeros_like(current_q), reward - current_q)
+                bootstrap_error = td_error - reward_error
+
+                # Clip bootstrapped error if positive
+                target_increase = th.ones_like(current_q) * .9 + reliability * .1
+
+                max_increase = find_capped_softmax_boost_stable(row_vector=all_current_q_values, index=replay_data.actions.long(), percentage=target_increase)
+
+                clipped_bootstrap_error = th.clamp(bootstrap_error, max=max_increase)
+
+                adj_target_q_values = current_q_values + reward_error + clipped_bootstrap_error
+                
+                if (self.num_timesteps%100==0) and (gradient_step==0):
+                    mask = adj_target_q_values != target_q_values
+                    if mask.sum() > 0:
+                        print(f"{mask.sum() / len(mask)=}")
+                        print(f"{all_current_q_values[mask.squeeze(1)]=}")
+                        print(f"{th.softmax(all_current_q_values, dim=1)[mask.squeeze(1)]=}")
+                        print(f"{max_increase[mask]=}")
+                        print(f"{bootstrap_error[mask]=}")
+                        print(f"{clipped_bootstrap_error[mask]=}")
+                        print(f"{reward_error[mask]=}")
+                        print(f"{target_q_values[mask]=}")
+                        print(f"{adj_target_q_values[mask]=}")
+                        print(f"{reliability[mask]=}")
+                        print("---")
+                
+                
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none')
+
+            if self.to_scale_with_reliability == "bootstrap_increase_scaling":
+
+                next_q = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_q = current_q_values
+                reward = replay_data.rewards
+
+                # Split error into reward-error and bootstrap-error
+                td_error = next_q + reward - current_q
+                reward_error = th.maximum(th.zeros_like(current_q), reward - current_q)
+                bootstrap_error = td_error - reward_error
+
+                scaled_bootstrap_error = bootstrap_error * reliability ** .2
+                final_bootstrap_error = th.minimum(bootstrap_error, scaled_bootstrap_error)
+
+                adj_target_q_values = current_q + reward_error + final_bootstrap_error
+
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none')
+
+                if (self.num_timesteps%1000==0) and (gradient_step==0):
+                    print(reliability.min(), reliability.max())
+                    loss_was_clipped = adj_target_q_values != target_q_values
+                    print(f"Proportion clipped: {loss_was_clipped.sum() / len(loss_was_clipped)}")
+
+                sums_correct = th.isclose(td_error, bootstrap_error + reward_error, atol=1e-4)
+                if not sums_correct.all():
+                    print(f"{td_error[sums_correct]=}")
+                    print(f"{reward_error[sums_correct]=}")
+                    print(f"{bootstrap_error[sums_correct]=}")
+                    print("---")
+
+                    import sys
+                    sys.exit()
+
+            if self.to_scale_with_reliability == "clipped_bootstrap":
+
+                next_q = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_q = current_q_values
+                reward = replay_data.rewards
+
+                # Split error into reward-error and bootstrap-error
+                td_error = next_q + reward - current_q
+                reward_error = th.maximum(th.zeros_like(current_q), reward - current_q)
+                bootstrap_error = td_error - reward_error
+
+                # Clip bootstrapped error if positive
+                max_bootstrap_error = th.max(bootstrap_error)
+                floored_reliability = 0.5 + reliability * 0.5
+                upper_limit = max_bootstrap_error * floored_reliability
+                clipped_bootstrap_error = th.clamp(bootstrap_error, max=upper_limit)
+
+                adj_bootstrap_error = th.minimum(clipped_bootstrap_error, bootstrap_error)
+                adj_target_q_values = current_q + reward_error + adj_bootstrap_error
+
+                if (self.num_timesteps%1000==0) and (gradient_step==0):
+                    print(reliability.min(), reliability.max())
+                    loss_was_clipped = adj_target_q_values != target_q_values
+                    print(f"Proportion clipped: {loss_was_clipped.sum() / len(loss_was_clipped)}")
+
+                sums_correct = th.isclose(td_error, bootstrap_error + reward_error, atol=1e-4)
+                if not sums_correct.all():
+                    print(f"{td_error[sums_correct]=}")
+                    print(f"{reward_error[sums_correct]=}")
+                    print(f"{bootstrap_error[sums_correct]=}")
+                    print("---")
+
+                    import sys
+                    sys.exit()
+
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none')
+
+            if self.to_scale_with_reliability == "importance_sampling":
+
+                td_errors = abs(target_q_values - current_q_values)
+                relative_sample_importance = (1 + td_errors) / (1  + subsequent_tds)
+                weights = relative_sample_importance ** .3
+                weights /= weights.mean()
+
+                # print(f"{weights.min(), weights.mean(), weights.max()=}")
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * weights
+
+            if self.to_scale_with_reliability == "importance_sampling2": # works pretty well for Acro & CP, weak for LL
+
+                relative_sample_importance = 1 / (1  + subsequent_tds)
+                weights = relative_sample_importance ** .3
+                weights /= weights.mean()
+
+               #  print(f"{weights.min(), weights.mean(), weights.max()=}")
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * weights
+
+            if self.to_scale_with_reliability == "importance_sampling3": # works well for all - see T20
+                # relative_sample_importance = 1 / (1  + subsequent_tds)
+
+                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
+
+                weights = 1 / (1 + subsequent_tds / self.max_subsequent_tds)
+                weights /= weights.mean()
+
+                self.weight_history.append(weights)
+                # if (self.num_timesteps%2048==0) and (gradient_step==0):
+
+                #     import matplotlib.pyplot as plt
+
+                #     plt.hist(self.weight_history, bins = 100)
+                #     plt.title(f"After {self.num_timesteps} timesteps")
+                #     plt.show()
+
+                #     print(f"{weights.min(), weights.max()=}")
+                #     self.weight_history = []
+
+                # print(f"{weights.min(), weights.mean(), weights.max()=}")
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * weights
+
+            if self.to_scale_with_reliability == "importance_sampling4":
+
+                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
+                weights = th.exp(-subsequent_tds / self.max_subsequent_tds)
+                weights /= weights.mean()
+                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * weights
+                
+            if self.to_scale_with_reliability == "scaledown_with_threshold":
+
+                next_q = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_q = current_q_values
+                reward = replay_data.rewards
+
+                # Split error into reward-error and bootstrap-error
+                td_error = next_q + reward - current_q
+                reward_error = th.maximum(th.zeros_like(current_q), reward - current_q)
+                bootstrap_error = td_error - reward_error
+
+                # Scale error larger 1 back
+                error_over_1 = th.maximum(th.zeros_like(bootstrap_error), bootstrap_error-1)
+                error_under_1 = th.clamp(bootstrap_error, max=1)
+                clipped_bootstrap_error = error_under_1 + error_over_1 * reliability
+                assert th.allclose(bootstrap_error, error_over_1 + error_under_1)
+
+                adj_bootstrap_error = th.minimum(clipped_bootstrap_error, bootstrap_error)
+                adj_target_q_values = current_q + reward_error + adj_bootstrap_error
+
+                if (self.num_timesteps%1000==0) and (gradient_step==0):
+                    print(reliability.min(), reliability.max())
+                    loss_was_clipped = adj_target_q_values != target_q_values
+                    print(f"Proportion clipped: {loss_was_clipped.sum() / len(loss_was_clipped)}")
+
+                sums_correct = th.isclose(td_error, bootstrap_error + reward_error, atol=1e-4)
+                if not sums_correct.all():
+                    print(f"{td_error[sums_correct]=}")
+                    print(f"{reward_error[sums_correct]=}")
+                    print(f"{bootstrap_error[sums_correct]=}")
+                    print("---")
+
+                    import sys
+                    sys.exit()
+
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none')
+
             if self.to_scale_with_reliability == "scaled_bootstrap":
 
-                max_next = th.max(next_q_values)
+                next_ = (1 - replay_data.dones) * self.gamma * next_q_values
+                current_ = current_q_values
+                reward_ = replay_data.rewards
+
+                # Bei decrease garnix machen
+                # Bei increase:
+                #   Die auf next zu attribuierende Erhöhung limitieren
+
+                target = next_ + reward_
+
+                
+                keep_next = current_ - reward_
+                inc_next = next_ - keep_next
+
+
+                bootstrapped_qval_increase = next_q_values - (current_q_values - replay_data.rewards)
+                bootstrapped_qval_maintenance = next_q_values - bootstrapped_qval_increase
+
+                max_bootstrapped_qval_increase = max(bootstrapped_qval_increase)
+
+                max_clip = max_bootstrapped_qval_increase * reliability
+                bootstrapped_qval_increase_clipped = th.clamp(bootstrapped_qval_increase, max=max_clip)
+
+                target_q_values_adj = replay_data.rewards + (1 - replay_data.dones) * self.gamma * (bootstrapped_qval_maintenance + bootstrapped_qval_increase_clipped)
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+                print(f"{bootstrapped_qval_increase=}")
+                print(f"{bootstrapped_qval_maintenance=}")
+                print(f"{next_q_values=}")
+                assert (bootstrapped_qval_increase + bootstrapped_qval_maintenance == next_q_values).all()
+                
+                # mask = next_q_values_adj != next_q_values
+                # # print(f"{subsequent_tds=}")
+                # print(f"{max_next_clip[mask]=}")
+                # print(f"{next_q_values_adj[mask]=}")
+                # print(f"{next_q_values[mask]=}")
+                # print(f"{target_q_values_adj[mask]=}")
+                # print(f"{target_q_values[mask]=}")
+                # print(f"{reliability[mask]=}")
+                # print("---")
+
+            if self.to_scale_with_reliability == "scaled_bootstrap_sub":
+
+                self.stored_q_values.extend(subsequent_tds)
+                max_next = max(self.stored_q_values)
+                # print(len(self.stored_q_values))
+
+                
                 max_next_clip = max_next * reliability
                 next_q_values_adj = th.clamp(next_q_values, max_next_clip)
                 target_q_values_adj = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_adj
                 loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
 
+            if self.to_scale_with_reliability == "ddqn_blend_inv": # works very well
 
-            if self.to_scale_with_reliability == "ddqn_blend":
-
-                # progress_scaled_reliability = prop_progress + (1 - prop_progress) * reliability
+                noise = subsequent_tds / subsequent_tds.max()
 
                 next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
                 target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
 
-                # cons_target = th.minimum(target_q_values, target_q_values_ddqn)
-                # agg_target = th.maximum(target_q_values, target_q_values_ddqn)
+                target_q_values_adj = (
+                    0.5 * target_q_values +
+                    0.5 * noise * target_q_values + 
+                    0.5 * (1-noise) * target_q_values_ddqn
+                )
 
-                target_q_values_adj = target_q_values * reliability + target_q_values_ddqn * (1 - reliability)
                 loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
 
-                # print(f"{target_q_values_ddqn[0]=}")
-                # print(f"{target_q_values[0]=}")
-                # print(f"{cons_target[0]=}")
-                # print(f"{agg_target[0]=}")
-                # print(f"{reliability[:3]=}")
-                # print(f"{target_q_values[:3]=}")
+            if self.to_scale_with_reliability == "ddqn_blend_inv_v2": # works well, but not for LunarLander
+
+                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
+                noise = subsequent_tds / self.max_subsequent_tds
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    noise * target_q_values + 
+                    (1-noise) * target_q_values_ddqn
+                )
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_v3": #
+
+                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
+
+                noise = subsequent_tds / self.max_subsequent_tds
+
+                correction_factor = (1 - noise) ** 2
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    (1 - correction_factor) * target_q_values + 
+                    correction_factor * target_q_values_ddqn
+                )
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_v4": #
+
+                with th.no_grad():
+                    # Get next values from online network
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    next_q_values_online, _ = all_next_q_values_online.max(dim=1)
+                    next_q_values_online = next_q_values_online.reshape(-1, 1)
+
+                target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                noise = subsequent_tds / subsequent_tds.max()
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    0.5 * target_q_values_online +
+                    0.5 * noise * target_q_values_online + 
+                    0.5 * (1-noise) * target_q_values_ddqn
+                )
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend":
+
+                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
+                noise = subsequent_tds / self.max_subsequent_tds 
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    0.5 * target_q_values +
+                    0.5 * (1-noise) * target_q_values + 
+                    0.5 * noise * target_q_values_ddqn
+                ) 
+
+                # print(f"{subsequent_tds[:3]=}")
+                # print(f"{subsequent_tds.max()=}")
+                # print(f"{noise[:3]=}")
                 # print(f"{target_q_values_ddqn[:3]=}")
+                # print(f"{target_q_values[:3]=}")
                 # print(f"{target_q_values_adj[:3]=}")
-                # print()
+                # print("---")
+                
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
 
             if self.to_scale_with_reliability == "logsumexp":
 
@@ -308,24 +754,45 @@ class RDQN(OffPolicyAlgorithm):
                     print(f"{(was_clipped / batch_size).sum()=}")
                     print("-----")
 
+            if self.to_scale_with_reliability == "loss_scaling_floored":
+                
+                abs_loss = target_q_values - current_q_values
+
+                base_loss = th.clamp(abs_loss, max=1)
+
+                scaled_added_loss = (abs_loss - base_loss) * reliability
+
+                adj_target_q_values = current_q_values + base_loss + scaled_added_loss
+
+                # print(f"{abs_loss[:3]=}")
+                # print(f"{base_loss[:3]=}")
+                # print(f"{scaled_added_loss[:3]=}")
+
+                loss = F.smooth_l1_loss(current_q_values, adj_target_q_values, reduction='none') * reliability
+                # print("---------")
+
             if self.to_scale_with_reliability == "loss":
+                if (self.num_timesteps%100==0) and (gradient_step==0):
+                    print(f"{reliability.min(), reliability.mean(), reliability.max()=}")
+
                 loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability
 
             if self.to_scale_with_reliability == "weighted_avg":
 
-                # progress_scaled_reliability = prop_progress + (1 - prop_progress) * reliability
+                ranks = (-subsequent_tds.flatten()).argsort().argsort() / (len(subsequent_tds)-1)
 
-                self.max_subsequent_tds = max(self.max_subsequent_tds, subsequent_tds.sum())
-                scaling_strength = subsequent_tds.sum() / self.max_subsequent_tds
+                # subsequent_tds = th.clamp(subsequent_tds, min=1e-6)
+                # inv_subsequent_tds = 1 / subsequent_tds
 
-                scaled_subsequent_tds = np.sqrt(subsequent_tds)
-                inv_subsequent_tds = 1 / (scaled_subsequent_tds + 1e-6)
+                # weights = inv_subsequent_tds / th.sum(inv_subsequent_tds) 
+                # weights = weights * len(weights)
 
-                prio_weights = inv_subsequent_tds / inv_subsequent_tds.sum()
-                uniform_weight = 1 / batch_size
-                weights = prio_weights * .1 + uniform_weight * .9
+                regularized_weights = .5 + ranks
 
-                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * weights
+                # print(f"{ranks=}")
+                # print(f"{regularized_weights.min(), regularized_weights.mean(), regularized_weights.max()=}")
+                
+                loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * regularized_weights.squeeze()
                 loss = loss.sum()
 
             if self.to_scale_with_reliability == "hardsoft":
@@ -408,6 +875,36 @@ class RDQN(OffPolicyAlgorithm):
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * adj_next_q_values
                 loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none') * reliability
 
+            if self.to_scale_with_reliability == "clip_max_discounted_return":
+
+                max_clip = max_discounted_return * reliability
+
+                clipped_target_q_values = th.clamp(target_q_values, max=max_clip) 
+
+                loss = F.smooth_l1_loss(current_q_values, clipped_target_q_values, reduction='none')
+
+
+                
+                # print(f"{was_clipped.sum()/len(was_clipped)=}")
+                # print(f"{max_clip[was_clipped]=}")
+                # print(f"{reliability[was_clipped]=}")
+                # print("---")
+
+                if (self.num_timesteps%10==0) and (gradient_step == 0):
+                    was_clipped = target_q_values!=clipped_target_q_values
+
+                    if was_clipped.sum() > 0:
+                        print(f"{was_clipped.sum()/len(was_clipped)=}")
+                        print(f"{max_clip[was_clipped]=}")
+                        print(f"{reliability[was_clipped]=}")
+                        print(f"{clipped_target_q_values[was_clipped]=}")
+                        print(f"{target_q_values[was_clipped]=}")
+                        print("-------")
+                    else:
+                        print("no-clip")
+                        print("-------")
+
+
             loss = th.mean(loss)
             losses.append(loss.item())
 
@@ -423,15 +920,7 @@ class RDQN(OffPolicyAlgorithm):
 
                 td_errors = current_q_values - target_q_values
                 new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1)) # + 1e-6
-
-                # if self.num_timesteps > 49000:
-                #     print(f"{new_td_errors=}")
-                #     print(f"{current_q_values=}")
-                #     print(f"{target_q_values=}")
-                #     print(f"{td_errors=}")
-                #     print(f"{sample_idxs=}")
-                #     print("---")
-
+                # new_td_errors = F.smooth_l1_loss(current_q_values, target_q_values, reduction='none').cpu().numpy().reshape(-1)
 
                 self.replay_buffer.update_priorities(idxes=sample_idxs, new_td_errors=new_td_errors)
 

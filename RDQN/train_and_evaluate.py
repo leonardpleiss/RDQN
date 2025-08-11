@@ -9,7 +9,8 @@ from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.logger import Logger, HumanOutputFormat, CSVOutputFormat, TensorBoardOutputFormat
 import os
 import ast
-
+import pickle
+from stable_baselines3.dqn.rdqn import RDQN
 
 if __name__ == "__main__":
     ######################################## PARAMETERS ########################################
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "0408_T02" # "2207_LL_1eval_v5"
+    trial_name = "1108_T3" # "2207_LL_1eval_v5"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -29,28 +30,28 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
 
-        sys.argv.append("LunarLander-v2") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("R_UNI_a10")
+        sys.argv.append("Acrobot-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
+        sys.argv.append("DR_UNI_a10")
         sys.argv.append("RDQN")
         sys.argv.append("10")
         sys.argv.append("0")
 
     print(sys.argv)
 
-    environment_names = [sys.argv[1]] # ["CartPole-v1", "Acrobot-v1", "LunarLander-v2"] # 
+    environment_names =  [sys.argv[1]] # ["LunarLander-v2", "Acrobot-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"] #"CartPole-v1"] #] # [sys.argv[1]]
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
     model_names = [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    to_scale_with_reliability_options = ["scaled_bootstrap"]
+    to_scale_with_reliability_options = ["ddqn_blend_inv_v4"]
 
     ##############################################################################################
      
     trial_start_date = date.today().strftime("%Y%m%d")
 
     for environment_name in environment_names:
-        for iteration in range(starting_seed, iterations_per_env+starting_seed):
+        for iteration in  range(starting_seed, iterations_per_env+starting_seed):
             for buffer_name in buffer_names:
                 for model_name in model_names:
                     for to_scale_with_reliability in to_scale_with_reliability_options:
@@ -115,6 +116,11 @@ if __name__ == "__main__":
                             replay_buffer_log_path=trial_result_folder_path,
                         )
 
+                        if model_class == RDQN:
+                            model.to_scale_with_reliability = to_scale_with_reliability
+                            print(model.to_scale_with_reliability)
+                            print(f"{to_scale_with_reliability} is used.")
+
                         eval_callback = EvalCallback(eval_env, eval_freq=max_timesteps/num_evals/n_envs, 
                                                     callback_on_new_best=callback_on_new_best,
                                                     verbose=1, n_eval_episodes=n_eval_episodes,
@@ -133,3 +139,8 @@ if __name__ == "__main__":
 
                         if save_weights:
                             model.save(trial_result_folder_path + "weights")
+
+                        
+                        store_path = "weight_history.pkl"
+                        with open(store_path, 'wb') as f:
+                            pickle.dump(model.weight_history, f)
