@@ -118,12 +118,19 @@ AC_IS_2 = [19, 17, 9, 17, 22, 15, 20, 10, 10, 12]
 AC_IS_3 = [10, 18, 19, 26, 15, 6, 21, 10, 19, 15]
 AC_IS_3_ND = [26, 31, 10, 26, 19, 17, 26, 13, 14, 19]
 AC_IV_BLEND = [6, 13, 6, 15, 13, 13, 8, 19, 15, 17]
+AC_IV_BLEND_OL = [7, 4, 5, 5, 3, 4, 10, 2, 5, 4]
 
 LL_CLIP = [38, 11, 50, 34, 18, 8, 12, 56, 16, 21]
 LL_SCALE = [31, 66, 38, 42, 7, 26, 21, 21, 17, 24]
 LL_IS_5 = [41, 39, 13, 18, 55, 19, 14, 20, 27, 50]
 LL_IS_3 = [15, 35, 13, 47, 32, 16, 12, 33, 16, 21]
 LL_IV_BLEND = [26, 31, 14, 17, 36, 27, 15, 26, 15, 23]
+LL_IV_BLEND_OL = [16, 14, 22, 44, 31, 45, 10, 17, 30, 19]
+
+print( np.mean(np.array(LL_DDQN_BL) / 100.000) )
+print( np.mean(np.array(AC_DDQN_BL) / 50.000) )
+print( np.mean(np.array(CP_DDQN_BL) / 50.000) )
+sys.exit()
 
 print("LunarLander")
 print(np.mean(LL_DQN_BL))
@@ -132,6 +139,7 @@ print(np.mean(LL_CLIP))
 print(np.mean(LL_SCALE))
 print(np.mean(LL_IS_3))
 print(np.mean(LL_IV_BLEND))
+print(np.mean(LL_IV_BLEND_OL))
 
 print()
 
@@ -142,7 +150,8 @@ print(np.mean(AC_CLIP))
 print(np.mean(AC_SCALE))
 print(np.mean(AC_IS_2))
 print(np.mean(AC_IS_3))
-print(np.mean(CP_IV_BLEND))
+print(np.mean(AC_IV_BLEND))
+print(np.mean(AC_IV_BLEND_OL))
 print()
 
 print("CartPole")
