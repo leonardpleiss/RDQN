@@ -118,8 +118,6 @@ class DDQN(DQN):
             # Retrieve the q-values for the actions from the replay buffer
             current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
 
-            raw_loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction="none").squeeze() * sample_weights
-            print(raw_loss)
             # Compute Huber loss (less sensitive to outliers)
             loss = th.mean(F.smooth_l1_loss(current_q_values, target_q_values, reduction="none").squeeze() * sample_weights)
             losses.append(loss.item())

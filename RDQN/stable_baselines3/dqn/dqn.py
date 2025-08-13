@@ -204,7 +204,7 @@ class DQN(OffPolicyAlgorithm):
             else:
                 assert self.replay_buffer_class.__name__ == "ReplayBuffer", f"'ReplayBuffer' expected, {self.replay_buffer_class.__name__} provided."
                 replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env) # type: ignore[union-attr]
-                sample_weights = th.ones_like(replay_data.actions, requires_grad=False, device=self.device)
+                sample_weights = th.ones(replay_data.actions.shape[0], requires_grad=False, device=self.device)
                 
             with th.no_grad():
                 # Compute the next Q-values using the target network
