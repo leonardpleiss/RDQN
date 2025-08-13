@@ -110,6 +110,7 @@ CP_IS_3_SQU = [34, 13, 28, 9, 28, 27.5, 15.5, 18, 5, 15]
 CP_IS_3_ND = [30, 7.5, 18, 25.5, 2, 19.5, 19, 12.5, 8, 4.5]
 CP_IV_BLEND = [5.5, 15, 7.5, 12, 16, 16, 12.5, 8.5, 21, 12.5]
 CP_IV_BLEND_OL = [7, 4, 4.5, 4.5, 8.5, 5, 3.4, 4.5, 6.5, 5.5]
+CP_IV_BLEND_ND = [9.5, 13.5, 15.5, 7, 11, 15, 17, 9, 8.5, 18]
 
 AC_CLIP = [26, 23, 28, 9, 11, 23, 27, 15, 11, 25]
 AC_SCALE = [28, 9, 14, 10, 21, 14, 10, 23, 12, 11]
@@ -119,6 +120,7 @@ AC_IS_3 = [10, 18, 19, 26, 15, 6, 21, 10, 19, 15]
 AC_IS_3_ND = [26, 31, 10, 26, 19, 17, 26, 13, 14, 19]
 AC_IV_BLEND = [6, 13, 6, 15, 13, 13, 8, 19, 15, 17]
 AC_IV_BLEND_OL = [7, 4, 5, 5, 3, 4, 10, 2, 5, 4]
+AC_IV_BLEND_ND = [7, 3, 5, 13, 4, 5, 15, 6, 4, 7]
 
 LL_CLIP = [38, 11, 50, 34, 18, 8, 12, 56, 16, 21]
 LL_SCALE = [31, 66, 38, 42, 7, 26, 21, 21, 17, 24]
@@ -126,11 +128,12 @@ LL_IS_5 = [41, 39, 13, 18, 55, 19, 14, 20, 27, 50]
 LL_IS_3 = [15, 35, 13, 47, 32, 16, 12, 33, 16, 21]
 LL_IV_BLEND = [26, 31, 14, 17, 36, 27, 15, 26, 15, 23]
 LL_IV_BLEND_OL = [16, 14, 22, 44, 31, 45, 10, 17, 30, 19]
+LL_IV_BLEND_ND = [21, 40, 29, 24, 25, 19, 16, 14, 20, 23]
 
-print( np.mean(np.array(LL_DDQN_BL) / 100.000) )
-print( np.mean(np.array(AC_DDQN_BL) / 50.000) )
-print( np.mean(np.array(CP_DDQN_BL) / 50.000) )
-sys.exit()
+# print( np.mean(np.array(LL_DDQN_BL) / 100.000) )
+# print( np.mean(np.array(AC_DDQN_BL) / 50.000) )
+# print( np.mean(np.array(CP_DDQN_BL) / 50.000) )
+# sys.exit()
 
 print("LunarLander")
 print(np.mean(LL_DQN_BL))
@@ -140,6 +143,7 @@ print(np.mean(LL_SCALE))
 print(np.mean(LL_IS_3))
 print(np.mean(LL_IV_BLEND))
 print(np.mean(LL_IV_BLEND_OL))
+print(np.mean(LL_IV_BLEND_ND))
 
 print()
 
@@ -152,6 +156,8 @@ print(np.mean(AC_IS_2))
 print(np.mean(AC_IS_3))
 print(np.mean(AC_IV_BLEND))
 print(np.mean(AC_IV_BLEND_OL))
+print(np.mean(AC_IV_BLEND_ND))
+
 print()
 
 print("CartPole")
@@ -164,6 +170,8 @@ print(np.mean(CP_IS_))
 print(np.mean(CP_IS_3))
 print(np.mean(CP_IV_BLEND))
 print(np.mean(CP_IV_BLEND_OL))
+print(np.mean(CP_IV_BLEND_ND))
+
 
 
 def percent_lower(current, reference):

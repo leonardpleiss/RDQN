@@ -97,7 +97,7 @@ class DDQN(DQN):
             else:
                 assert self.replay_buffer_class.__name__ == "ReplayBuffer", f"'ReplayBuffer' expected, {self.replay_buffer_class.__name__} provided."
                 replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env) # type: ignore[union-attr]
-                sample_weights = th.ones_like(replay_data.actions, requires_grad=False, device=self.device)
+                sample_weights = th.ones(replay_data.actions.shape[0], requires_grad=False, device=self.device)
                 
             with th.no_grad():
                 # Get the action from the Q-network
@@ -118,6 +118,8 @@ class DDQN(DQN):
             # Retrieve the q-values for the actions from the replay buffer
             current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
 
+            raw_loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction="none").squeeze() * sample_weights
+            print(raw_loss)
             # Compute Huber loss (less sensitive to outliers)
             loss = th.mean(F.smooth_l1_loss(current_q_values, target_q_values, reduction="none").squeeze() * sample_weights)
             losses.append(loss.item())

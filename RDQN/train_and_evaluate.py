@@ -21,7 +21,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "1108_T5" # "2207_LL_1eval_v5"
+    trial_name = "tst" # "2207_LL_1eval_v5"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -31,16 +31,16 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
 
         sys.argv.append("Acrobot-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("R_UNI_a10")
-        sys.argv.append("RDQN")
-        sys.argv.append("10")
+        sys.argv.append("ReaPER_a4a2")#"R_UNI_a10")
+        sys.argv.append("DDQN")
+        sys.argv.append("20")
         sys.argv.append("0")
 
     print(sys.argv)
 
-    environment_names = [sys.argv[1]]# ["LunarLander-v2", "Acrobot-v1", "CartPole-v1"] # [sys.argv[1]]
+    environment_names = ["LunarLander-v2", "Acrobot-v1", "CartPole-v1"] # [sys.argv[1]]
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]]
+    model_names = ["DDQN"] #[sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
@@ -139,7 +139,6 @@ if __name__ == "__main__":
                         if save_weights:
                             model.save(trial_result_folder_path + "weights")
 
-                        
-                        store_path = "weight_history.pkl"
-                        with open(store_path, 'wb') as f:
-                            pickle.dump(model.weight_history, f)
+                        # store_path = "weight_history.pkl"
+                        # with open(store_path, 'wb') as f:
+                        #     pickle.dump(model.weight_history, f)
