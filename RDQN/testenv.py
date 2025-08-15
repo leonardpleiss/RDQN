@@ -4,6 +4,16 @@ import pickle
 import os
 import matplotlib.pyplot as plt
 
+x = np.arange(0, 100) / 100
+
+x_squ = x ** 10
+
+plt.plot(x, x_squ)
+plt.show()
+
+sys.exit()
+
+
 # max_subsequent_td = 5000
 
 # tds = [1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -88,8 +98,10 @@ import matplotlib.pyplot as plt
 
 # sys.exit()
 
-LL_DDQN_BL = [13, 28, 19, 45, 23, 33, 24, 42, 19, 20]
-LL_DQN_BL = [47, 15, 25, 40, 15, 37, 39, 22, 23, 24]
+# LL_DDQN_BL = [13, 28, 19, 45, 23, 33, 24, 42, 19, 20]
+# LL_DQN_BL = [47, 15, 25, 40, 15, 37, 39, 22, 23, 24]
+LL_DDQN_BL = [26, 14, 67, 40, 70, 14, 33, 36, 19, 36]
+LL_DQN_BL = [22, 33, 37, 20, 45, 20, 16, 18, 21, 24]
 
 CP_DDQN_BL = [4.5, 23, 27, 29.5, 10.5, 19.5, 16.5, 29, 23.5, 13.5]
 CP_DQN_BL = [19.5, 26, 32.5, 34, 2, 30.5, 17, 10.5, 26, 23.5]

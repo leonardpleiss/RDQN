@@ -232,7 +232,7 @@ class RDQN(OffPolicyAlgorithm):
         # "epsilon" for the epsilon-greedy exploration
         self.exploration_rate = 0.0
 
-        assert to_scale_with_reliability in ["ddqn_blend_inv_v2", "ddqn_blend_inv_v3", "ddqn_blend_inv_v4", "importance_sampling4", "importance_sampling3", "importance_sampling2", "importance_sampling", "bootstrap_increase_scaling", "clip_max_discounted_return", "loss_scaling_floored", "range_based_clip", "max_softmax_ratio", "scaledown_with_threshold", "clipped_bootstrap","ddqn_blend_inv", "scaled_bootstrap2", "scaled_bootstrap", "ddqn_blend", "logsumexp", "hardsoft", "loss", "loss_2", "target", "clip", "clip2", "limit_target_mean_deviation", "weighted_avg", "clip_target_historically"]
+        assert to_scale_with_reliability in ["ddqn_blend_inv_epipos_dqn", "pure_online", "ddqn_blend_inv_epipos_wavg", "ddqn_blend_inv_epipos", "distance_scaled_step", "ddqn_blend_inv_v2", "ddqn_blend_inv_v6", "ddqn_blend_inv_v5", "ddqn_blend_inv_v3", "ddqn_blend_inv_v4", "importance_sampling4", "importance_sampling3", "importance_sampling2", "importance_sampling", "bootstrap_increase_scaling", "clip_max_discounted_return", "loss_scaling_floored", "range_based_clip", "max_softmax_ratio", "scaledown_with_threshold", "clipped_bootstrap","ddqn_blend_inv", "scaled_bootstrap2", "scaled_bootstrap", "ddqn_blend", "logsumexp", "hardsoft", "loss", "loss_2", "target", "clip", "clip2", "limit_target_mean_deviation", "weighted_avg", "clip_target_historically"]
         self.to_scale_with_reliability = to_scale_with_reliability
 
         self.max_bootstrap_increase = 0.
@@ -283,7 +283,8 @@ class RDQN(OffPolicyAlgorithm):
             # Copy running stats, see GH issue #996
             polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
 
-            self.replay_buffer.update_reliabilities()
+            if self.replay_buffer_class.__name__ in ["DR_UNI", "R_UNI"]:
+                self.replay_buffer.update_reliabilities()
 
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
@@ -300,14 +301,19 @@ class RDQN(OffPolicyAlgorithm):
         for gradient_step in range(gradient_steps):
 
             if self.replay_buffer_class.__name__ in ["R_UNI"]:
-                replay_data, reliability, sample_idxs, max_td, subsequent_tds = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+                replay_data, reliability, sample_idxs, max_td, subsequent_tds, relative_episodic_position = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
                 reliability = th.from_numpy(reliability).to(self.device).unsqueeze(1).float()
                 subsequent_tds = th.from_numpy(subsequent_tds).to(self.device).unsqueeze(1).float()
+                relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
 
             elif self.replay_buffer_class.__name__ in ["DR_UNI"]:
                 replay_data, reliability, sample_idxs, max_discounted_return, subsequent_tds = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env, discount_factor=self.gamma)
                 reliability = th.from_numpy(reliability).to(self.device).unsqueeze(1).float()
                 subsequent_tds = th.from_numpy(subsequent_tds).to(self.device).unsqueeze(1).float()
+
+            elif self.replay_buffer_class.__name__ in ["PositionalReplayBuffer"]:
+                replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+                relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
                 
             elif self.replay_buffer_class.__name__ == "ReplayBuffer":
                 replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env) # type: ignore[union-attr]
@@ -623,7 +629,7 @@ class RDQN(OffPolicyAlgorithm):
                 noise = subsequent_tds / subsequent_tds.max()
 
                 next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
-                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+                next_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
 
                 target_q_values_adj = (
                     0.5 * target_q_values +
@@ -689,28 +695,161 @@ class RDQN(OffPolicyAlgorithm):
 
                 loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
 
+            if self.to_scale_with_reliability == "ddqn_blend_inv_v5": #
+
+                with th.no_grad():
+                    # Get next values from online network
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    next_q_values_online, _ = all_next_q_values_online.max(dim=1)
+                    next_q_values_online = next_q_values_online.reshape(-1, 1)
+
+                target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                noise = subsequent_tds / subsequent_tds.max()
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    0.5 * target_q_values_online + 0.5 * target_q_values_ddqn
+                )
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_v6": #
+
+                with th.no_grad():
+                    # Get next values from online network
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    next_q_values_online, _ = all_next_q_values_online.max(dim=1)
+                    next_q_values_online = next_q_values_online.reshape(-1, 1)
+
+                target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                noise = subsequent_tds / subsequent_tds.max()
+
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                target_q_values_adj = (
+                    0.25 * target_q_values_online + 0.75 * target_q_values_ddqn
+                ) # v7
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "pure_online":
+                next_actions_online = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                next_q_values_online = self.q_net(replay_data.next_observations).gather(1, next_actions_online)
+                target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_online, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_epipos_dqn": # best so far
+
+                with th.no_grad():
+
+                    next_actions_online = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+
+                    # DDQN Target
+                    next_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_ddqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_ddqn
+
+                    # Online Target
+                    next_q_values_online = self.q_net(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # Adjusted Target
+                    target_q_values_adj = (
+                        0.5 * target_q_values + 
+                        0.5 * (1-relative_episodic_position) * target_q_values + 
+                        0.5 * relative_episodic_position * target_q_values_ddqn
+                    )
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_epipos": # best so far
+
+                with th.no_grad():
+
+                    next_actions_online = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+
+                    # DDQN Target
+                    next_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_ddqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_ddqn
+
+                    # Online Target
+                    next_q_values_online = self.q_net(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # Adjusted Target
+                    target_q_values_adj = (
+                        0.5 * target_q_values_online + 
+                        0.5 * (1-relative_episodic_position) * target_q_values_online + 
+                        0.5 * relative_episodic_position * target_q_values_ddqn
+                    )
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "ddqn_blend_inv_epipos_wavg":
+
+                with th.no_grad():
+
+                    relative_episodic_position = th.clamp(relative_episodic_position, min=.1, max=.9)
+
+                    next_actions_online = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+
+                    # DDQN Target
+                    next_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_ddqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_ddqn
+
+                    # Online Target
+                    next_q_values_online = self.q_net(replay_data.next_observations).gather(1, next_actions_online)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # Adjusted Target
+                    target_q_values_adj = (
+                        (1-relative_episodic_position) * target_q_values_online + 
+                        relative_episodic_position * target_q_values_ddqn
+                    )
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
             if self.to_scale_with_reliability == "ddqn_blend":
 
-                self.max_subsequent_tds = max(self.max_subsequent_tds, th.max(subsequent_tds))
-                noise = subsequent_tds / self.max_subsequent_tds 
+                noise = subsequent_tds / subsequent_tds.max()
 
                 next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
                 target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
 
                 target_q_values_adj = (
                     0.5 * target_q_values +
-                    0.5 * (1-noise) * target_q_values + 
-                    0.5 * noise * target_q_values_ddqn
-                ) 
+                    0.5 * noise * target_q_values_ddqn +
+                    0.5 * (1-noise) * target_q_values
+                )
 
-                # print(f"{subsequent_tds[:3]=}")
-                # print(f"{subsequent_tds.max()=}")
-                # print(f"{noise[:3]=}")
-                # print(f"{target_q_values_ddqn[:3]=}")
-                # print(f"{target_q_values[:3]=}")
-                # print(f"{target_q_values_adj[:3]=}")
-                # print("---")
-                
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
+
+            if self.to_scale_with_reliability == "distance_scaled_step":
+
+                noise = subsequent_tds / subsequent_tds.max()
+
+                # Get online target
+                with th.no_grad():
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    next_q_values_online, _ = all_next_q_values_online.max(dim=1)
+                    next_q_values_online = next_q_values_online.reshape(-1, 1)
+                target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                # Get DDQN target
+                next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
+                target_q_values_ddqn = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+
+                distances = 1 + abs(target_q_values_ddqn - target_q_values_online)
+
+                print(distances)
+
+                adjusted_change = (target_q_values_online - current_q_values) / distances
+
+                target_q_values_adj = current_q_values + adjusted_change
+
                 loss = F.smooth_l1_loss(current_q_values, target_q_values_adj, reduction='none')
 
             if self.to_scale_with_reliability == "logsumexp":
@@ -1111,33 +1250,45 @@ class RDQN(OffPolicyAlgorithm):
         obs_tensor = th.from_numpy(self._last_original_obs).float().to(self.device)
         action_tensor = th.from_numpy(buffer_action).long().to(self.device)
 
-        current_q_values = self.q_net(obs_tensor)
-        current_q_values = th.gather(current_q_values, dim=1, index=action_tensor.unsqueeze(1))
+        if self.replay_buffer_class.__name__ in ["DR_UNI", "R_UNI"]:
 
-        with th.no_grad():
-            next_obs_tensor = th.from_numpy(next_obs).float().to(self.device)
-            all_next_q_values = self.q_net_target(next_obs_tensor)
-            next_q_values, _ = all_next_q_values.max(dim=1)
-            next_q_values = next_q_values.reshape(-1, 1)
+            current_q_values = self.q_net(obs_tensor)
+            current_q_values = th.gather(current_q_values, dim=1, index=action_tensor.unsqueeze(1))
 
-            reward_tensor = th.from_numpy(reward_).float().to(self.device)
-            dones_tensor = th.from_numpy(dones).float().to(self.device)
-            target_q_values = reward_tensor + (1 - dones_tensor) * self.gamma * next_q_values
+            with th.no_grad():
+                next_obs_tensor = th.from_numpy(next_obs).float().to(self.device)
+                all_next_q_values = self.q_net_target(next_obs_tensor)
+                next_q_values, _ = all_next_q_values.max(dim=1)
+                next_q_values = next_q_values.reshape(-1, 1)
 
-        td_errors = current_q_values - target_q_values
-        new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1))
+                reward_tensor = th.from_numpy(reward_).float().to(self.device)
+                dones_tensor = th.from_numpy(dones).float().to(self.device)
+                target_q_values = reward_tensor + (1 - dones_tensor) * self.gamma * next_q_values
 
-        replay_buffer.add(
-            self._last_original_obs,  # still numpy
-            next_obs,                 # still numpy
-            buffer_action,
-            reward_,
-            dones,
-            infos,
-            new_td_errors,
-        )
+            td_errors = current_q_values - target_q_values
+            new_td_errors = np.abs(td_errors.detach().cpu().numpy().reshape(-1))
 
-        self.max_reward = max(self.max_reward, reward_)
+            replay_buffer.add(
+                self._last_original_obs,  # still numpy
+                next_obs,                 # still numpy
+                buffer_action,
+                reward_,
+                dones,
+                infos,
+                new_td_errors,
+            )
+
+            self.max_reward = max(self.max_reward, reward_)
+
+        else:
+            replay_buffer.add(
+                self._last_original_obs,  # still numpy
+                next_obs,                 # still numpy
+                buffer_action,
+                reward_,
+                dones,
+                infos,
+            )
 
         self._last_obs = new_obs
         if self._vec_normalize_env is not None:

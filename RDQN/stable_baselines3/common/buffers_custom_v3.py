@@ -36,6 +36,7 @@ class R_UNI(ReplayBuffer):
         self._max_sum_td = 1.
         self.max_ep_return = 1.
         self.rmean_ep_return = 1.
+        self.max_episode_length = 1.
 
         # Setup sampling array
         self.sample_arange = np.arange(self.buffer_size * self.n_envs)
@@ -59,6 +60,7 @@ class R_UNI(ReplayBuffer):
         # Setup timestep storage
         self._current_timestep = np.ones(self.n_envs,)
         self.timesteps = np.zeros((self.buffer_size, self.n_envs))
+        self.max_timesteps = np.zeros((self.buffer_size, self.n_envs))
 
         # Setup logger
         self.log_path = log_path
@@ -87,13 +89,16 @@ class R_UNI(ReplayBuffer):
         self.timesteps[self.pos] = self._current_timestep
         self.cum_tds[self.pos] = (~self.last_done * self.cum_tds[self.pos-1]) + new_td_errors
 
-        # self.sum_tds[self.pos] = self._max_sum_td
+        self.max_timesteps[self.pos] = self._current_timestep * 2
+        self.max_episode_length = max(self.max_episode_length, np.max(self._current_timestep))
 
         # Compute actual sampling weights once episode is done
         if done.any():
             ep_done_row_idxes, ep_done_col_idxes = np.where((self.episodes==self._current_episode) & done)
             self.sum_tds[ep_done_row_idxes, ep_done_col_idxes] = self.cum_tds[self.pos][ep_done_col_idxes]
             self._max_sum_td = max(self._max_sum_td, np.max(self.sum_tds[ep_done_row_idxes, ep_done_col_idxes]))
+
+            self.max_timesteps[ep_done_row_idxes, ep_done_col_idxes] = self.timesteps[self.pos][ep_done_col_idxes]
 
         # Update tracking variables
         self._current_timestep = 1 + (self._current_timestep * ~done)
@@ -124,11 +129,16 @@ class R_UNI(ReplayBuffer):
         # reliability = (1 - (subsequent_tds / max_sum_tds)) ** self._alpha2
         reliability = (1 - (subsequent_tds / sum_tds)) ** self._alpha2
 
+        # relative_episodic_position = self.timesteps[batch_idxes] / self.max_episode_length
+        relative_episodic_position = self.timesteps[batch_idxes] / self.max_timesteps[batch_idxes]
+
         encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
 
         assert (subsequent_tds >= 0).all(), f"{subsequent_tds[subsequent_tds<0], cum_tds[subsequent_tds<0], sum_tds[subsequent_tds<0]}"
+        assert (relative_episodic_position <= 1).all()
+        assert (relative_episodic_position >= 0).all()
 
-        return ReplayBufferSamples(*tuple(map(self.to_torch, encoded_sample))), reliability, (row_idxes, col_idxes), self._max_td, subsequent_tds # self.max_ep_return, self.rmean_ep_return
+        return ReplayBufferSamples(*tuple(map(self.to_torch, encoded_sample))), reliability, (row_idxes, col_idxes), self._max_td, subsequent_tds, relative_episodic_position # self.max_ep_return, self.rmean_ep_return
     
     
     def update_priorities(self, idxes, new_td_errors):

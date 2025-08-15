@@ -21,7 +21,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "tst" # "2207_LL_1eval_v5"
+    trial_name = "1508_T02" # "2207_LL_1eval_v5"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -31,20 +31,20 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
 
         sys.argv.append("Acrobot-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
-        sys.argv.append("ReaPER_a4a2")#"R_UNI_a10")
-        sys.argv.append("DDQN")
-        sys.argv.append("20")
+        sys.argv.append("PositionalReplayBuffer")
+        sys.argv.append("RDQN")
+        sys.argv.append("10")
         sys.argv.append("0")
 
     print(sys.argv)
 
-    environment_names = [sys.argv[1]] #["LunarLander-v2", "Acrobot-v1", "CartPole-v1"]
+    environment_names = [sys.argv[1]] # ["LunarLander-v2", "Acrobot-v1", "CartPole-v1"] #[sys.argv[1]]
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
     model_names = [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    to_scale_with_reliability_options = ["ddqn_blend_inv"]
+    to_scale_with_reliability_options = ["ddqn_blend_inv_epipos"]
 
     ##############################################################################################
      
@@ -65,7 +65,7 @@ if __name__ == "__main__":
                         replay_buffer_class, replay_buffer_kwargs = get_replay_buffer_config(buffer_name=buffer_name)
                         export_suffix = f"{trial_start_date}_{trial_name}_{buffer_name}"
 
-                        if replay_buffer_kwargs:
+                        if "alpha2" in list(replay_buffer_kwargs.keys()):
                             alpha2 = replay_buffer_kwargs["alpha2"]
 
                         tb_log_path = get_tb_storage_file_path(environment_name, replay_buffer_class, model_name)
@@ -78,9 +78,7 @@ if __name__ == "__main__":
                         target_update_interval, gradient_steps, gamma, eval_exploration_fraction, progress_bar = \
                         get_environment_specific_settings(model_name, environment_name, n_envs=n_envs, seed=iteration, use_sb3_standard_params=use_sb3_standard_params)
 
-                        export_suffix += f"_{batch_size}bs_{iteration}seed_{int(num_evals)}evalfreq_{n_envs}env_scaledBy{to_scale_with_reliability.capitalize()}"
-
-                        print(export_suffix)
+                        export_suffix += f"_{batch_size}bs_{iteration}seed_{int(num_evals)}evalfreq_{n_envs}_{to_scale_with_reliability}"
 
                         model = model_class(
 

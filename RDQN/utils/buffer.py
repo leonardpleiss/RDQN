@@ -3,10 +3,15 @@ from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.buffers_custom import PrioritizedReplayBuffer, PrioritizedReplayBufferPropagating
 from stable_baselines3.common.buffers_custom_v3 import R_UNI
 from stable_baselines3.common.buffers_custom_v4 import DR_UNI
-
+from stable_baselines3.common.buffers_custom_v5 import PositionalReplayBuffer
 
 def get_replay_buffer_config(buffer_name, check_frequency=100_000):
 
+    if buffer_name == "PositionalReplayBuffer":
+        replay_buffer_class = PositionalReplayBuffer
+        replay_buffer_kwargs = {
+    }
+        
     if buffer_name == "DR_UNI_a10":
         replay_buffer_class = DR_UNI
         replay_buffer_kwargs = {
