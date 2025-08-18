@@ -16,7 +16,7 @@ def get_export_path(
 
     print(os.listdir())
     trial_result_folder = f"{datetime_string}_{model_name}_{parsed_environment_name}_{buffer_name}"
-    trial_result_folder_path = f"code_cluster/RDQN/results/{trial_result_folder}/"
+    trial_result_folder_path = f"./results/{trial_result_folder}/"
     os.makedirs(trial_result_folder_path, exist_ok=True)
 
 
