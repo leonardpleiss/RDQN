@@ -1,0 +1,128 @@
+# Job Template
+
+This script takes care of two things: Scheduling your runs (i.e., interacting with SLURM) and managing run environments. For this purpose, it runs your program on a set of instances/for a set of configurations according to the values given in the configuration file: `configuration.sh`. We recommend going through the [wiki](https://oscm.maximilian-schiffer.com/it/it-wiki/-/wikis/home), or at least the [cluster usage guide](https://oscm.maximilian-schiffer.com/it/it-wiki/-/wikis/Cluster-Usage-Guide) before attempting to use this template. We further provide a walkthrough on setting up the template for a python-based project on the [example](https://oscm.maximilian-schiffer.com/it/it-wiki/-/tree/examples/python) branch.
+
+## Nomenclature
+
+**Run**: A single, atomic, execution of your program. Given instances `c1.txt` and `c2.txt` and parameter settings `p1.txt, p2.txt`, we'd have 4 runs in a full factorial design: `c1.txt p1.txt`, `c1.txt p2.txt`, and so on. A run is atomic, i.e., cannot be interrupted or paused, and runs on a single machine.
+
+**Job:** The set of all runs, i.e., your experiment. Not to be confused with SLURM jobs.
+
+**Base directory:** The directory from which the job script is executed. You should put your files here.
+
+## Getting started
+
+A quick guide on setting everything up. We recommend reading the whole documentation before attempting to configure the template.
+
+0. Set up any virtual environments (e.g. `python -m venv venv && pip install -r requirements.txt`) and transfer any code/data files to the cluster.
+1. Replace `executable` with your script/program. 
+2. Edit `configuration.sh`. Make sure to load any modules (e.g., gurobi, cplex, python) you may need
+3. Generate `run_list.csv`
+4. Add folders containing your instances/data/settings
+5. Make sure that `run.sh`, `executable` and all scripts in `scripts/` are marked executable: `chmod +x executable run.sh scripts/*`
+6. Start a screen session `screen -S <your_session_name>`, run `run.sh` and detach by pressing `Ctrl + A + D`
+7. `results`, `logs` and `error-logs` will contain your program's output
+
+## Files and directories
+
+The following gives an example for the directory structure expected by the script. Details (such as directory names) can be fine-tuned in `configuration.sh`. Any directories/files not explained below are not required/not managed by the script. They will, however, be accessible by your program when it is run. All changes you make to these directories while your program runs will be persistent.
+
+Please also take a look into the files in the repository. They give an example of the directory's state after running `./run.sh`.
+
+```
+.
+├── configuration.sh
+├── data
+│   ├── c1.txt
+│   └── p1.txt
+├── error-logs
+│   └── c1.txt-p1.txt
+│       ├── console-error.log
+│       ├── console.log
+│       └── other_log.txt
+├── executable
+├── joblog.csv
+├── logs
+│   └── c1.txt-p1.txt
+│       ├── console-error.log
+│       ├── console.log
+│       └── other_log.txt
+├── results
+│   └── c1.txt-p1.txt
+│       ├── other_results_file.csv
+│       └── result1.csv
+├── run_list.csv
+├── run.sh
+└── scripts
+    ├── dispatch_instance.sh
+    └── queue_job.sh
+```
+
+### run_list.csv
+
+This file contains one line for each run to be executed. It uses `,` as delimiter. Each line (or row in excel) corresponds to a single run. Each column specifies an argument of this run and these are passed separately (in order of occurrence) to your executable. This file requires `LF` line-endings, such that run_list.csv files created in windows will likely require conversion. To see if this is the case, run `file run_list.csv` and check for "CRLF line terminators". You can use the command `dos2unix run_list.csv` to convert `run_list.csv` to the proper format.
+
+### executable
+
+Your program. Can be anything executable, e.g. a shell script for more complicated runs. It will be executed for run with the respective arguments from `run_list.csv`. 
+
+### scripts
+
+This folder contains all scripts this template relies on. In almost all cases it should not be necessary to edit any of these.
+
+### logs, error-logs and results
+
+These directories will contain a subdirectory for each run. By default, the name of this subdirectory is constructed by joining all columns from the current line in `run_list.csv` with the character `-`. So files of run `c1.txt,p1.txt` would be stored in `c1.txt-p1.txt`. The run name can be customized in `configuration.sh`.
+
+The `logs` folder stores program logs. These include any logs your program writes to the local `logs/` directory in addition to `console.log` and `console-error.log`, which contain the output/errors written to the console.
+
+The `error-logs` folder will contain a copy of everything in `logs/` if an error occurs while running your program/the job script. 
+
+The `results` folder will contain all files written to local `results/`.
+
+### joblog.csv
+
+This file is generated by `parallel`. It will contain a summary of all finished runs. For more information, see [GNU Parallel](https://www.gnu.org/software/parallel/parallel_tutorial.html#Progress-information). This file essentially keeps track of failed and successful runs such that another invocation of `./run.sh` will only schedule runs that either failed or have not been run yet. Please note that the runtime reported in `joblog.csv` may be considerably larger than the actual runtime of your program as it includes the time the run waits to be scheduled by SLURM.
+
+### run.sh
+
+The template script itself. You should not need to modify this.
+
+### configuration.sh
+
+The script's configuration. Use this file to setup your environment, specify the resources needed per run and other parameters.
+
+## How your program is executed
+
+The main problem with concurrent runs is that result files and logs need to be written in a fashion such that no conflicts occur, i.e., each run is isolated in a dedicated environment. The job template script manages this environment for you. This is done as follows: Upon starting a run, the script creates a temporary directory on the local filesystem that mirrors the base directory. It also sets up your shell environment (loaded modules, variables, etc.) such that each run mimics the configuration when running `./run.sh`. Then your program is run via `./EXECUTABLE <line from run_list argument 1> <line from run_list argument 2> ...`. Finally, all files written to `results, logs, error-logs` will be transferred back to the base directory. As such, any files you write to `results/` `logs/` and `error-logs/` will be in the respective directories (e.g., `results/run-name/`) inside the shared base directory after your program has finished running. All other files will be discarded. This guarantees that no conflicts can occur.
+
+## Customization
+
+Most of the time it will suffice to edit `configuration.sh`. For an overview on customization options see the comments in the file.
+
+Should that not be the case, behavior can be modified by editing `scripts/prepare.sh` and `scripts/epilog.sh`, which are called after the environment has been set up and after the actual executable has been called. You could also just specify an arbitrary script as executable in `configuration.sh` and do extra work before/after calling your original executable. 
+
+All other modifications need to be done to the scripts directly. Here, we'd like to ask you to talk to one of the admins directly, perhaps your use case can be integrated into the template.
+
+## Considerations
+
+* Please be as accurate as possible with the resources allocated for your script. Especially the time limit is important as it is used by SLURM's internal scheduler. 
+* ~We've set a maximum time limit of 5 hours per run as that should suffice for most common tasks. Should you require more computation time (e.g., for ML training), talk to one of us directly.~
+
+# Troubleshooting / FAQ
+
+* ^ at /usr/local/bin/parallel line 12191, <GEN0> line 1.
+
+This indicates a formatting issue in your `run_list.csv` file. See [run_list.csv](https://oscm.maximilian-schiffer.com/it/it-wiki/-/master/README.md#run_listcsv) for details.
+
+* Empty results/ directory
+
+Make sure that you are writing your results to the `results` directory. A common pitfall here is to use windows path separators: File `results\\x` will not be written to the `results` directory but a separate file called `results\\x` on unix systems.
+
+* `./run.sh` exists immediatly and my runs do not start
+
+Make sure that there is no `joblog.csv` file from previous runs in the directory. If there is, rename it to `joblog.old.csv` and try again. See the GNU Parallel documentation for further explanation.
+
+* ModuleNotFoundError: No module named ___
+
+Make sure that the virtual environment is properly set up. Activate your virtual environment and use the following commands for troubleshooting: `which python` shows the Python path in use, `pip freeze` shows the installed packages.

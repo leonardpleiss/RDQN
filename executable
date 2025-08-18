@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# INSTANCE_FILE_NAME=$1 # Will be c1.txt
+# PARAM_FILE_NAME=$2 # Will be p1.txt
+# OTHER_CMD_ARGUMENT=$3 # If we had 4 columns in run_list.csv (3 minus the run name)
+
+# We could do something with these files here
+# data/ will exist locally
+# cat data/${INSTANCE_FILE_NAME}
+# cat data/${PARAM_FILE_NAME}
+
+# Log some stuff
+
+# Log to console (STDOUT)
+echo "Will contain the console output of your program, i.e., written with print() (captures STDOUT)."
+echo "List invididual parameters passed:"
+# echo "INSTANCE_FILE_NAME: ${INSTANCE_FILE_NAME}"
+# echo "PARAM_FILE_NAME: ${PARAM_FILE_NAME}"
+echo "List all parameters passed: $@"
+# Log to STDERR
+echo "Will contain errors logged by your program, i.e., lines written to STDERR." >&2
+# Log to some custom file
+echo "A file written to logs/ by your program" > logs/other_log.txt
+
+# Write some results
+echo "A file written to results/ by your program." > results/other_results_file.csv
+echo "Another file written to results/ by your program" > results/result1.csv
+
+python3 train_and_evaluate.py $1 $2 $3 $4 $5
+
+# Exit with a non 0 error code. This indicates that an error occured.
+exit 5
+# If we instead exited with 0, no files would be written to error-logs

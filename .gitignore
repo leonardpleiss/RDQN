@@ -1,0 +1,14 @@
+.venv/
+RDQN/.venv/
+RDQN/results/*
+results/*
+logs/
+error-logs/
+venv/
+joblog.csv
+result_analysis/saved_figures/
+RDQN/result_analysis/saved_figures/
+**/results/*
+**/.venv/*
+**/result_analysis/*
+!results/.gitkeep

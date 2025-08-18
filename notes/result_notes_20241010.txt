@@ -1,0 +1,18 @@
+Zwischenergebnisse:
+
+Cartpole / 100_000 timesteps:
+
+    DPER mit 0% Priorisierungsrate (=ergebnisäquivalent mit ER):
+    - Score: 218.8
+    - Trainingsdauer: 2020s
+    - Ergebnisse hier: /Users/leonardpleiss/Documents/Promotion/PRIO_REPLAY/code/DPER/results/tensorboard_logs/DQN_CartPole-v1_DynamicPrioritizedReplayBuffer/DQN_1/events.out.tfevents.1728572575.MacBook-Air-von-Leonard.local.72218.0
+    
+    DPER mit 10% Priorisierungsrate:
+    - Score: <10 / 310.10
+    - Trainingsdauer: 1800s
+    - Ergebnisse hier: /Users/leonardpleiss/Documents/Promotion/PRIO_REPLAY/code/DPER/results/tensorboard_logs/DQN_CartPole-v1_DynamicPrioritizedReplayBuffer/DQN_2/events.out.tfevents.1728576091.MacBook-Air-von-Leonard.local.72964.0
+
+    ER:
+    - Score: 231.20
+    - Trainingsdauer: 17s
+    - Ergebnisse hier: /Users/leonardpleiss/Documents/Promotion/PRIO_REPLAY/code/DPER/results/tensorboard_logs/DQN_CartPole-v1_ReplayBuffer/DQN_1/events.out.tfevents.1728574852.MacBook-Air-von-Leonard.local.72545.0
