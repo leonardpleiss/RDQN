@@ -34,7 +34,8 @@ class PositionalReplayBuffer(ReplayBuffer):
         self.episode_length = np.zeros((self.buffer_size, self.n_envs))
         self.ep_start_idx = np.ones(self.n_envs,)
 
-        self._max_episode_length = 1
+        self.max_episode_length = 1
+        self.is_current_episode = np.zeros((self.buffer_size, self.n_envs)).astype(bool)
 
     def add(
         self,
@@ -47,9 +48,32 @@ class PositionalReplayBuffer(ReplayBuffer):
     ) -> None:
         
         self.timesteps[self.pos] = self._current_timestep
+        self.episode_length[self.pos] = self._current_timestep * 2 # Set episodic positioning to 1. (pure target) for all transitions of ongoing trajectories
+        self.is_current_episode[self.pos] = np.ones(self.n_envs,).astype(bool)
 
-        # self.episode_length[self.pos] = self._current_timestep * 2 # Balanced target while episode not done
-        # self.episode_length[self.pos] = self._current_timestep # Pure DDQN target while episode not done
+        self.max_episode_length = max(np.max(self._current_timestep), self.max_episode_length)
+        
+        self.episode_length[self.is_current_episode] = self.max_episode_length
+
+        self.is_current_episode[:, done] = False
+        self._current_timestep = np.where(done, 1, self._current_timestep + 1)
+
+        super().add(obs, next_obs, action, reward, done, infos)
+
+        self.ep_start_idx[done] = self.pos
+
+    def add_old(
+        self,
+        obs: np.ndarray,
+        next_obs: np.ndarray,
+        action: np.ndarray,
+        reward: np.ndarray,
+        done: np.ndarray,
+        infos: List[Dict[str, Any]],
+    ) -> None:
+        
+        self.timesteps[self.pos] = self._current_timestep
+        self.episode_length[self.pos] = self._current_timestep * 2 # Set episodic positioning to 1. (pure target) for all transitions of ongoing trajectories
 
         if done.any():
 
@@ -72,7 +96,6 @@ class PositionalReplayBuffer(ReplayBuffer):
 
             self.episode_length[row_idx, col_idx] = np.repeat(ep_lens, lengths)
 
-        self._max_episode_length = max(self._max_episode_length, np.max(self._current_timestep))
         self._current_timestep = np.where(done, 1, self._current_timestep + 1)
 
         super().add(obs, next_obs, action, reward, done, infos)
@@ -89,31 +112,7 @@ class PositionalReplayBuffer(ReplayBuffer):
 
         relative_episodic_position = self.timesteps[batch_idxes] / self.episode_length[batch_idxes]
 
-        relative_episodic_position[np.isinf(relative_episodic_position)] = 0. # Pure online target while episode not done
-
-        encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
-
-        return encoded_sample, batch_idxes, relative_episodic_position
-    
-    def sample_alternative(self, batch_size: int, env: Optional[VecNormalize] = None) -> ReplayBufferSamples:
-
-        upper_bound = self.buffer_size if self.full else self.pos
-        
-        row_idxes = np.random.randint(0, upper_bound, size=batch_size)
-        col_idxes = np.random.randint(0, self.n_envs, size=batch_size)
-        batch_idxes = (row_idxes, col_idxes)
-
-        subsequent_steps = self.episode_length[batch_idxes] - self.timesteps[batch_idxes]
-        subsequent_steps[subsequent_steps<0] = 0. # Pure online target while episode not done
-
-        max_subsequent_steps = self._max_episode_length - 1
-        relative_episodic_position = 1 - (subsequent_steps / max_subsequent_steps)
-
-        # print(f"{self.timesteps[batch_idxes]=}")
-        # print(f"{self.episode_length[batch_idxes]=}")
-        # print(f"{self._max_episode_length=}")
-        # print(f"{relative_episodic_position=}")
-        # print("---")
+        # relative_episodic_position[np.isinf(relative_episodic_position)] = 0. # Pure online target while episode not done
 
         encoded_sample = super()._get_samples(row_idxes, env=env, env_indices=col_idxes)
 

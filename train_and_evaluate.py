@@ -6,10 +6,6 @@ from pstats import Stats
 from datetime import date
 import sys
 from stable_baselines3.common.callbacks import EvalCallback
-from stable_baselines3.common.logger import Logger, HumanOutputFormat, CSVOutputFormat, TensorBoardOutputFormat
-import os
-import ast
-import pickle
 from stable_baselines3.dqn.rdqn import RDQN
 
 if __name__ == "__main__":
@@ -21,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "1808_T7" # "2207_LL_1eval_v5"
+    trial_name = "1908_T9" # "2207_LL_1eval_v5"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -38,9 +34,9 @@ if __name__ == "__main__":
 
     print(sys.argv)
 
-    environment_names =  [sys.argv[1]] # ["LunarLander-v2", "Acrobot-v1", "CartPole-v1"]
+    environment_names = ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"] # [sys.argv[1]] # 
     buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]]
+    model_names = [sys.argv[3]] 
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
@@ -51,13 +47,15 @@ if __name__ == "__main__":
     trial_start_date = date.today().strftime("%Y%m%d")
 
     for environment_name in environment_names:
-        for iteration in  range(starting_seed, iterations_per_env+starting_seed):
+        for iteration in range(starting_seed, iterations_per_env+starting_seed):
             for buffer_name in buffer_names:
                 for model_name in model_names:
                     for to_scale_with_reliability in to_scale_with_reliability_options:
 
                         if model_name in ["DDQN", "DQN"]:
                             buffer_name = "UNI"
+                        elif model_name in ["RDQN"]:
+                            buffer_name = "PositionalReplayBuffer"
 
                         print(f"seed: {iteration}")
                         seed_everything(iteration)

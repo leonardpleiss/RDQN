@@ -185,6 +185,9 @@ class DQN(OffPolicyAlgorithm):
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
+
+        assert self.replay_buffer_class.__name__ == "ReplayBuffer"
+        
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
         # Update learning rate according to schedule
@@ -193,18 +196,7 @@ class DQN(OffPolicyAlgorithm):
         losses = []
         for _ in range(gradient_steps):
 
-            if self.replay_buffer_class.__name__ in ["PrioritizedReplayBuffer", "PrioritizedReplayBufferPropagating", "CustomPrioritizedReplayBufferCumSumProp", "DynamicPrioritizedReplayBuffer", "CustomPrioritizedReplayBuffer", "CustomPrioritizedReplayBufferCumSum", "CustomPrioritizedReplayBufferCumSum2", "CustomPrioritizedReplayBufferCumSum3", "CustomPrioritizedReplayBufferCumSum4", "DynamicPrioritizedReplayBuffer", "CustomPrioritizedReplayBufferCumSumWithTDProp"]:
-                start_beta = .4
-                end_beta = 1.
-                beta_increment = end_beta - start_beta
-                beta = start_beta + (self.num_timesteps / self._total_timesteps) * beta_increment
-                replay_data, sample_weights, sample_idxs = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env, beta=beta)
-                sample_weights = th.from_numpy(sample_weights).to(self.device)
-                
-            else:
-                assert self.replay_buffer_class.__name__ == "ReplayBuffer", f"'ReplayBuffer' expected, {self.replay_buffer_class.__name__} provided."
-                replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env) # type: ignore[union-attr]
-                sample_weights = th.ones(replay_data.actions.shape[0], requires_grad=False, device=self.device)
+            replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env) # type: ignore[union-attr]
                 
             with th.no_grad():
                 # Compute the next Q-values using the target network
@@ -223,7 +215,7 @@ class DQN(OffPolicyAlgorithm):
             current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
 
             # Compute Huber loss (less sensitive to outliers)
-            loss = th.mean(F.smooth_l1_loss(current_q_values, target_q_values, reduction="none").squeeze() * sample_weights)
+            loss = F.smooth_l1_loss(current_q_values, target_q_values)
             losses.append(loss.item())
 
             # Optimize the policy
@@ -233,12 +225,6 @@ class DQN(OffPolicyAlgorithm):
             # Clip gradient norm
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
-
-            if self.replay_buffer_class.__name__ in ["PrioritizedReplayBuffer", "PrioritizedReplayBufferPropagating", "CustomPrioritizedReplayBufferCumSumProp", "CustomPrioritizedReplayBuffer", "CustomPrioritizedReplayBufferCumSum2", "CustomPrioritizedReplayBufferCumSum3", "CustomPrioritizedReplayBufferCumSum4", "CustomPrioritizedReplayBufferCumSum", "CustomPrioritizedReplayBufferCumSumWithTDProp"]:
-                assert isinstance(self.replay_buffer, PrioritizedReplayBuffer) or isinstance(self.replay_buffer, CustomPrioritizedReplayBuffer) or isinstance(self.replay_buffer, CustomPrioritizedReplayBufferCumSum) or isinstance(self.replay_buffer, CustomPrioritizedReplayBufferCumSum2)  or isinstance(self.replay_buffer, CustomPrioritizedReplayBufferCumSum4) or isinstance(self.replay_buffer, CustomPrioritizedReplayBufferCumSum3) or isinstance(self.replay_buffer, PrioritizedReplayBufferPropagating) or isinstance(self.replay_buffer, CustomPrioritizedReplayBufferCumSumProp)
-                td_errors = current_q_values - target_q_values
-                new_priorities = np.abs(td_errors.detach().cpu().numpy().reshape(-1)) + 1e-6
-                self.replay_buffer.update_priorities(idxes=sample_idxs, priorities=new_priorities)
 
         # Increase update counter
         self._n_updates += gradient_steps

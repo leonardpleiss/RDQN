@@ -15,7 +15,6 @@ import torch.optim as optim
 from stable_baselines3.dqn import DQN
 from stable_baselines3.dqn.ddqn import DDQN
 from stable_baselines3.dqn.rdqn import RDQN
-from stable_baselines3.dqn.rddqn import RDDQN
 
 atari_5 = [
     "NameThisGameNoFrameskip-v4",
@@ -103,8 +102,6 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         model_class = DDQN
     elif model_name == "RDQN":
         model_class = RDQN
-    elif model_name == "RDDQN":
-        model_class = RDDQN
     else:
         raise ValueError(f"Model name not supported: {model_name}")
 
@@ -262,13 +259,13 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
                                   momentum=0.95, # Set according to original DDQN for RL paper (van Hasselt, 2015)
                                   centered=True))
         
-        if model_name in ["DQN", "RDQN"]:
+        if model_name in ["DQN"]:
             print("DQN parameters loaded")
             exploration_final_eps=.1 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
             target_update_interval=10_000 # Set according to DDQN paper (van Hasselt, 2015).
             eval_exploration_fraction = .05
 
-        elif model_name in ["DDQN", "RDDQN"]:
+        elif model_name in ["DDQN", "RDQN"]:
             print("DDQN parameters loaded")
             exploration_final_eps=.01 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
             target_update_interval=30_000 # Set according to DDQN paper (van Hasselt, 2015).
