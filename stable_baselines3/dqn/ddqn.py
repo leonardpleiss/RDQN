@@ -28,7 +28,7 @@ class DDQN(DQN):
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
 
-        assert self.replay_buffer_class.__name__ == "ReplayBuffer"
+        assert self.replay_buffer_class.__name__ in ["ReplayBuffer", "SelectiveReplayBuffer"]
 
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
@@ -45,14 +45,21 @@ class DDQN(DQN):
                 next_actions = self.q_net(replay_data.next_observations).argmax(dim=1, keepdim=True)
 
                 # Get the corresponding Q-value from the target network
-                next_q_values = self.q_net_target(replay_data.next_observations).gather(1, next_actions)
+                all_next_q_values = self.q_net_target(replay_data.next_observations)
 
                 # Avoid potential broadcast issue
-                next_q_values = next_q_values.reshape(-1, 1)
+                next_q_values = all_next_q_values.gather(dim=1, index=next_actions).reshape(-1, 1)
 
                 # 1-step TD target
-                target_q_values = replay_data.rewards + (1 - replay_data.dones.float()) * self.gamma * next_q_values
+                target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
+                # print(f"{self.q_net(replay_data.next_observations)[:3]=}")
+                # print(f"{next_actions[:3]=}")
+                # print(f"{all_next_q_values[:3]=}")
+                # print(f"{next_q_values[:3]=}")
+                # print("----")
+
+                # print(self.replay_buffer.buffer_size)
             # Get current Q-values estimates
             current_q_values = self.q_net(replay_data.observations)
 

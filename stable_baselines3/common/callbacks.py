@@ -564,6 +564,8 @@ class StopTrainingOnRewardThreshold(BaseCallback):
         self.reward_threshold = reward_threshold
 
     def _on_step(self) -> bool:
+
+        print(self.reward_threshold)
         assert self.parent is not None, "``StopTrainingOnMinimumReward`` callback must be used with an ``EvalCallback``"
         continue_training = bool(self.parent.best_mean_reward < self.reward_threshold)
         if self.verbose >= 1 and not continue_training:

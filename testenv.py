@@ -3,17 +3,78 @@ import sys
 import pickle
 import os
 import matplotlib.pyplot as plt
+import torch as th
 
-x = np.arange(0, 100) / 100
+x = th.tensor([True, True, False, False])
+y = th.tensor([True, False, True, False])
 
-x_squ = x ** 10
-
-plt.plot(x, x_squ)
-plt.show()
+print(x & y)
 
 sys.exit()
 
+def sigmoid_scale(vec, alpha=.1):
+    vec = th.as_tensor(vec, dtype=th.float32)
+    out = th.ones_like(vec)
+    mask = vec < 0
+    out[mask] = 2 * th.sigmoid(alpha * vec[mask])  # in (0,1), hits 1 at x=0
+    return out
 
+x = th.tensor([-2, -1, 0, 2, 4, 5])
+
+x_ = sigmoid_scale(x)
+
+print(x_)
+
+
+
+
+
+sys.exit()
+iters = 50
+
+n_action_lst = [2, 4, 8, 16, 32, 64]
+trajectory_length_lst = [10, 100, 1000]
+
+fig, axs = plt.subplots(nrows=len(n_action_lst), ncols=len(trajectory_length_lst))
+
+
+
+for row_idx, n_actions in enumerate(n_action_lst):
+
+    for col_idx, trajectory_length in enumerate(trajectory_length_lst):
+
+        inits = []
+        for _ in range(iters):
+
+            init = np.random.normal(0, .1, (trajectory_length, n_actions))
+            num_updates = trajectory_length * 1
+
+            for _ in range(num_updates):
+
+                transition_idx = np.random.randint(trajectory_length)
+                action_idx = np.argmax(init[transition_idx])
+
+                if transition_idx == (trajectory_length-1):
+                    init[transition_idx, action_idx] = 0
+                else:
+                    init[transition_idx, action_idx] = np.max(init[transition_idx + 1]) * .99
+
+            inits.append(np.max(init, axis=1))
+        
+        avg_inits = np.array(inits).mean(axis=0)
+        print(row_idx, col_idx)
+        axs[row_idx, col_idx].set_title(f"{n_actions} actions across {trajectory_length} timesteps")
+
+        axs[row_idx, col_idx].plot(np.arange(trajectory_length), avg_inits)
+
+plt.tight_layout()
+plt.show()
+        
+
+
+
+
+sys.exit()
 # max_subsequent_td = 5000
 
 # tds = [1, 1, 1, 1, 1, 1, 1, 1, 1]

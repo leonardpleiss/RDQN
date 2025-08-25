@@ -131,7 +131,23 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
     gamma = 0.99
     eval_exploration_fraction = .0
 
-    if environment_name == "CartPole-v1":
+    if environment_name == "MinAtar/Breakout-v1":
+
+        num_timesteps = 2_000_000
+        learning_rate=2.3e-3
+        learning_starts = 1000
+        reward_threshold = np.inf
+        callback_on_new_best = None
+        batch_size=32
+        buffer_size=100000
+        learning_starts=1000
+        target_update_interval=1000
+        exploration_fraction=.5
+        exploration_final_eps=0.01
+        policy_kwargs=dict(net_arch=[256, 256])
+        num_evals = 100
+
+    elif environment_name == "CartPole-v1":
 
         num_timesteps = 50000
         learning_rate=2.3e-3
@@ -149,24 +165,6 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
             exploration_final_eps=0.04
             policy_kwargs=dict(net_arch=[256, 256])
             num_evals = 100
-
-    elif environment_name == "CartPole-v0":
-
-        num_timesteps = 1_010_000
-        learning_rate=2.3e-3
-        learning_starts = 1_000_000
-
-        if not use_sb3_standard_params:
-            
-            batch_size=32
-            buffer_size=1_000_000
-            target_update_interval=10
-            train_freq=256
-            gradient_steps=128
-            exploration_fraction=0.16
-            exploration_final_eps=0.04
-            policy_kwargs=dict(net_arch=[256, 256])
-            num_evals = 1
 
     elif environment_name == "LunarLander-v2":
 
@@ -186,7 +184,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
             exploration_final_eps = 0.1
             policy_kwargs = dict(net_arch=[256, 256])
             num_evals = 100
-            n_eval_episodes = 1
+            n_eval_episodes = 1 # Delete later
 
     elif environment_name == "MountainCar-v0":
         
