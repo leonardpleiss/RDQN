@@ -582,8 +582,8 @@ class RDQN(DQN):
                     adaptive_target = target_q_values_online
                     
                     target_q_values_adj = (
-                        .9 * frozen_target +
-                        .1 * adaptive_target
+                        .5 * frozen_target +
+                        .5 * adaptive_target
                     )
 
                     # print(f"{all_next_q_values_online.shape=}")
