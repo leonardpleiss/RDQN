@@ -7,7 +7,6 @@ from datetime import date
 import sys
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.dqn.rdqn import RDQN
-import minatar
 
 if __name__ == "__main__":
     ######################################## PARAMETERS ########################################
