@@ -14,6 +14,7 @@ from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update
 from stable_baselines3.dqn.policies import CnnPolicy, DQNPolicy, MlpPolicy, MultiInputPolicy, QNetwork
+from stable_baselines3.common.buffers_custom_v9 import SelectiveReplayBuffer
 
 SelfDQN = TypeVar("SelfDQN", bound="DQN")
 
@@ -176,10 +177,23 @@ class DQN(OffPolicyAlgorithm):
         self._n_calls += 1
         # Account for multiple environments
         # each call to step() corresponds to n_envs transitions
+
+        # if self.replay_buffer_class.__name__ == "SelectiveReplayBuffer":
+        #     if self.replay_buffer.force_update == True:
+        #         polyak_update(self.q_net.parameters(), self.q_net_target.parameters(), self.tau)
+        #         # Copy running stats, see GH issue #996
+        #         polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
+
+        #         self.replay_buffer.force_update = False
+        #         # print("updated target")
+        # else:
         if self._n_calls % max(self.target_update_interval // self.n_envs, 1) == 0:
             polyak_update(self.q_net.parameters(), self.q_net_target.parameters(), self.tau)
             # Copy running stats, see GH issue #996
             polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
+
+            if self.replay_buffer_class.__name__ == "ForceIncludeReplayBuffer":
+                self.replay_buffer.update_on_target_update()
 
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)

@@ -5,30 +5,16 @@ import os
 import matplotlib.pyplot as plt
 import torch as th
 
-x = th.tensor([True, True, False, False])
-y = th.tensor([True, False, True, False])
+y = th.tensor([[0.0673, 0.0721, 0.0779],
+        [0.0470, 0.0113, 0.0233]])
+x = th.tensor([[ 0.0108,  0.0269, -0.0109],
+        [ 0.0007,  0.0324, -0.0185]])
 
-print(x & y)
-
-sys.exit()
-
-def sigmoid_scale(vec, alpha=.1):
-    vec = th.as_tensor(vec, dtype=th.float32)
-    out = th.ones_like(vec)
-    mask = vec < 0
-    out[mask] = 2 * th.sigmoid(alpha * vec[mask])  # in (0,1), hits 1 at x=0
-    return out
-
-x = th.tensor([-2, -1, 0, 2, 4, 5])
-
-x_ = sigmoid_scale(x)
-
-print(x_)
-
-
-
-
-
+print(th.sum(th.abs(x) + th.abs(y), dim=1))
+# tensor([[0.1906],
+#         [0.1092]])
+# tensor([[0.1330],
+#         [0.0667]])
 sys.exit()
 iters = 50
 

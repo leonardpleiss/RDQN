@@ -131,7 +131,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
     gamma = 0.99
     eval_exploration_fraction = .0
 
-    if environment_name == "MinAtar/Breakout-v1":
+    if environment_name.startswith("MinAtar/"):
 
         num_timesteps = 2_000_000
         learning_rate=2.3e-3
@@ -142,7 +142,7 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         buffer_size=100000
         learning_starts=1000
         target_update_interval=1000
-        exploration_fraction=.5
+        exploration_fraction=1_000_000/num_timesteps
         exploration_final_eps=0.01
         policy_kwargs=dict(net_arch=[256, 256])
         num_evals = 100

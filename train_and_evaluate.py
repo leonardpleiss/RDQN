@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "2208_Breakout_BigTrial"
+    trial_name = "2808_FULLRUN"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -30,17 +30,25 @@ if __name__ == "__main__":
         sys.argv.append("PositionalReplayBuffer")
         sys.argv.append("RDQN")
         sys.argv.append("1")
-        sys.argv.append("4")
+        sys.argv.append("1")
 
     print(sys.argv)
 
-    environment_names = [sys.argv[1]] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"] # [sys.argv[1]]
-    buffer_names = [sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]] # ["RDQN"] 
-    iterations_per_env = int(sys.argv[4]) 
+    minatar_envs = [
+        "MinAtar/Asterix-v1",
+        "MinAtar/Breakout-v1",
+        "MinAtar/Freeway-v1",
+        "MinAtar/Seaquest-v1",
+        "MinAtar/SpaceInvaders-v1"
+    ]
+
+    environment_names = [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
+    buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
+    model_names = [sys.argv[3]] # ["RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
+    iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["blend"]
+    targets = ["discard"]
 
     ##############################################################################################
      
@@ -53,10 +61,10 @@ if __name__ == "__main__":
 
                     target = targets[model_idx]
 
-                    # if model_name in ["DDQN", "DQN"]:
-                    #     buffer_name = "UNI"
-                    # elif model_name in ["RDQN"]:
-                    #     buffer_name = "PositionalReplayBuffer"
+                    if model_name in ["DDQN", "DQN"]:
+                        buffer_name = "UNI"
+                    elif model_name in ["RDQN"]:
+                        buffer_name = "PositionalReplayBuffer"
 
                     print(f"seed: {iteration}")
                     seed_everything(iteration)
@@ -81,7 +89,6 @@ if __name__ == "__main__":
 
                     if model_name == "RDQN":
                         export_suffix += f"_{target}"
-
 
                     model = model_class(
 

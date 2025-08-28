@@ -28,7 +28,7 @@ class DDQN(DQN):
 
     def train(self, gradient_steps: int, batch_size: int = 100) -> None:
 
-        assert self.replay_buffer_class.__name__ in ["ReplayBuffer", "SelectiveReplayBuffer"]
+        assert self.replay_buffer_class.__name__ in ["ReplayBuffer", "SelectiveReplayBuffer", "ForceIncludeReplayBuffer"]
 
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
@@ -37,8 +37,11 @@ class DDQN(DQN):
         
         losses = []
         for gradient_step in range(gradient_steps):
-                
-            replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+            
+            if self.replay_buffer_class.__name__ == "ForceIncludeReplayBuffer":
+                replay_data, sample_idxes = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+            else:
+                replay_data = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
                 
             with th.no_grad():
                 # Get the action from the Q-network
@@ -53,13 +56,6 @@ class DDQN(DQN):
                 # 1-step TD target
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
-                # print(f"{self.q_net(replay_data.next_observations)[:3]=}")
-                # print(f"{next_actions[:3]=}")
-                # print(f"{all_next_q_values[:3]=}")
-                # print(f"{next_q_values[:3]=}")
-                # print("----")
-
-                # print(self.replay_buffer.buffer_size)
             # Get current Q-values estimates
             current_q_values = self.q_net(replay_data.observations)
 
@@ -67,7 +63,19 @@ class DDQN(DQN):
             current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
 
             # Compute Huber loss (less sensitive to outliers)
-            loss = F.smooth_l1_loss(current_q_values, target_q_values)
+            loss = F.smooth_l1_loss(current_q_values, target_q_values, reduction="none")
+
+            if self.replay_buffer_class.__name__ == "ForceIncludeReplayBuffer":
+                _, force_include_indices = th.topk(th.abs(loss).squeeze(), int(len(loss) * .1))
+
+                row_idxes, col_idxes = sample_idxes
+
+                new_force_include_row_idxes = row_idxes[force_include_indices]
+                new_force_include_col_idxes = col_idxes[force_include_indices]
+
+                self.replay_buffer.add_force_includes_by_index(row=new_force_include_row_idxes, col=new_force_include_col_idxes)
+
+            loss = th.mean(loss)
             losses.append(loss.item())
 
             # Optimize the policy
