@@ -165,7 +165,7 @@ class RDQN(DQN):
 
             if self.target == "discard":
 
-                to_discard = 1
+                to_discard = batch_size
 
                 replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size + to_discard, env=self._vec_normalize_env)
                 relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()

@@ -35,10 +35,10 @@ if __name__ == "__main__":
     print(sys.argv)
 
     minatar_envs = [
-        "MinAtar/Asterix-v1",
+        # "MinAtar/Asterix-v1", # Agent doesnt learn effectively
         "MinAtar/Breakout-v1",
         "MinAtar/Freeway-v1",
-        # "MinAtar/Seaquest-v1",
+        # "MinAtar/Seaquest-v1", # Takes forever
         "MinAtar/SpaceInvaders-v1"
     ]
 
