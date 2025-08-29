@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "2808_FULLRUN"
+    trial_name = "2808_FULLRUN_v3"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         "MinAtar/Asterix-v1",
         "MinAtar/Breakout-v1",
         "MinAtar/Freeway-v1",
-        "MinAtar/Seaquest-v1",
+        # "MinAtar/Seaquest-v1",
         "MinAtar/SpaceInvaders-v1"
     ]
 
@@ -60,6 +60,8 @@ if __name__ == "__main__":
                 for model_idx, model_name in enumerate(model_names):
 
                     target = targets[model_idx]
+
+                    print(f"{target} is used.")
 
                     if model_name in ["DDQN", "DQN"]:
                         buffer_name = "UNI"
