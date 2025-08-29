@@ -48,7 +48,7 @@ if __name__ == "__main__":
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["discard_prop"]
+    targets = ["discard_prop_sample"]
 
     ##############################################################################################
      
