@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "2908_MinAtar_fullRun_5iter"
+    trial_name = "2908_MinAtar_fullRun_5iter_v2"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -42,13 +42,13 @@ if __name__ == "__main__":
         "MinAtar/Asterix-v1", # Agent doesnt learn effectively
     ]
 
-    environment_names = [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
+    environment_names = [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
     model_names = [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
+    targets = ["discard_prop_sample"] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
 
     ##############################################################################################
      
