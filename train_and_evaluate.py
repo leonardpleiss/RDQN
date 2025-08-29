@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     environment_names = [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
+    model_names = [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
