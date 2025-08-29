@@ -5,6 +5,12 @@ import os
 import matplotlib.pyplot as plt
 import torch as th
 
+cond = 4
+iters = 5
+time = 0.5
+games = 3
+print(cond * iters * time * games)
+sys.exit()
 
 current_q_values = th.zeros(3)
 

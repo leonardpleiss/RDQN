@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "2808_FULLRUN_v3"
+    trial_name = "2908_MinAtar_fullRun_5iter"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -29,26 +29,26 @@ if __name__ == "__main__":
         sys.argv.append("MinAtar/Breakout-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
         sys.argv.append("PositionalReplayBuffer")
         sys.argv.append("RDQN")
-        sys.argv.append("1")
-        sys.argv.append("1")
+        sys.argv.append("5")
+        sys.argv.append("0")
 
     print(sys.argv)
 
     minatar_envs = [
-        # "MinAtar/Asterix-v1", # Agent doesnt learn effectively
         "MinAtar/Breakout-v1",
         "MinAtar/Freeway-v1",
         # "MinAtar/Seaquest-v1", # Takes forever
-        "MinAtar/SpaceInvaders-v1"
+        "MinAtar/SpaceInvaders-v1",
+        "MinAtar/Asterix-v1", # Agent doesnt learn effectively
     ]
 
     environment_names = [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]] # ["RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
+    model_names = ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["discard_prop_sample"]
+    targets = ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
 
     ##############################################################################################
      
