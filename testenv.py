@@ -5,13 +5,6 @@ import os
 import matplotlib.pyplot as plt
 import torch as th
 
-cond = 4
-iters = 5
-time = 0.5
-games = 3
-print(cond * iters * time * games)
-sys.exit()
-
 current_q_values = th.zeros(3)
 
 target_q_values_ddqn = th.randn(3) * 100# th.tensor([-10, -3, -2, -1, 0, 1, 2, -2, -1, 0, 1, 2.1])
@@ -20,9 +13,8 @@ target_q_values_online = th.randn(3) * 100#th.tensor([-9, 1, 1, 1, 1, 1, 1, 2, 2
 ddqn_err = target_q_values_ddqn - current_q_values
 online_err = target_q_values_online - current_q_values
 new_online_err = target_q_values_online - (current_q_values + ddqn_err)
-online_error_change =  th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err))
 
-# online_err_increase_raw = (th.abs(online_err) - th.abs(new_online_err)) / (th.abs(ddqn_err) + 1e-8)
+online_error_change =  th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err))
 
 print(f"{target_q_values_ddqn=}")
 print(f"{target_q_values_online=}")
@@ -30,10 +22,22 @@ print(f"{ddqn_err=}")
 print(f"{online_err=}")
 print(f"{new_online_err=}")
 print(f"{online_error_change=}")
-# print(f"{online_err_increase_raw=}")
+# print(f"{online_err_increase_raw=}") 
 
+print( (np.arange(10) / 10) ** .5) 
 
 # Learnings: DDQN-Error braucht 1e-8
+
+
+
+
+
+
+
+
+
+
+
 
 
 
