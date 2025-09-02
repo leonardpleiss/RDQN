@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "2908_MinAtar_fullRun_5iter_v2"
+    trial_name = "0109_FULLRUN_v4"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         sys.argv.append("MinAtar/Breakout-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
         sys.argv.append("PositionalReplayBuffer")
         sys.argv.append("RDQN")
-        sys.argv.append("5")
+        sys.argv.append("3")
         sys.argv.append("0")
 
     print(sys.argv)
@@ -44,11 +44,11 @@ if __name__ == "__main__":
 
     environment_names = [sys.argv[1]] #minatar_envs # [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
+    model_names = [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DQN"] # [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["discard_prop_sample_noOVER"] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
+    targets = ["discard_OSR2_DQN"] #["discard_sample_OSR2_DQN", "discard_OSR2_DQN", "loss_scale_DQN", ""] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
 
     ##############################################################################################
      
@@ -115,7 +115,6 @@ if __name__ == "__main__":
                         target_update_interval=target_update_interval,
                         gradient_steps=gradient_steps,
                         gamma=gamma,
-                        # to_scale_with_reliability=to_scale_with_reliability,
 
                         # Tensorboard settings
                         tensorboard_log = tb_log_path + export_suffix + "/",

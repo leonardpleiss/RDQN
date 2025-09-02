@@ -126,7 +126,8 @@ class RDQN(DQN):
 
         for _ in range(gradient_steps):
 
-            if self.target == "loss_scale":
+            
+            if self.target == "loss_scale_DQN":
 
                 replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
                 relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
@@ -141,29 +142,129 @@ class RDQN(DQN):
                     all_next_q_values_offline = self.q_net_target(replay_data.next_observations)
 
                     next_actions_online = all_next_q_values_online.argmax(dim=1, keepdim=True)
+                    next_actions_offline = all_next_q_values_offline.argmax(dim=1, keepdim=True)
 
                     # Online Target
                     next_q_values_online = all_next_q_values_online.gather(1, next_actions_online).reshape(-1, 1)
                     target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
 
-                    # DDQN target
-                    next_q_values_ddqn = all_next_q_values_offline.gather(1, next_actions_online).reshape(-1, 1)
-                    target_q_values_ddqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_ddqn
+                    # DQN target
+                    next_q_values_dqn = all_next_q_values_offline.gather(1, next_actions_offline).reshape(-1, 1)
+                    target_q_values_dqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_dqn
 
-                    ddqn_err = target_q_values_ddqn - current_q_values
+                    dqn_err = target_q_values_dqn - current_q_values
                     online_err = target_q_values_online - current_q_values
-                    new_online_err = target_q_values_online - (current_q_values + ddqn_err)
-                    online_error_change =  th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err) + 1e-8)
+                    new_online_err = target_q_values_online - (current_q_values + dqn_err)
+                    online_error_change =  (th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err) + 1e-8)).detach()
 
-                    # online_error_change /= online_error_change.mean()
-                    online_error_change = th.clamp(online_error_change * 2, max=1.) ** .2
+                    online_more_extreme = ( (dqn_err * online_err) > 0) & (th.abs(online_err) > th.abs(dqn_err))
+                    online_error_change = th.where(online_more_extreme, 1, online_error_change)
 
                     self.logger.record("xustom/avg_online_error_change", online_error_change.mean().item(), exclude="tensorboard")
                     self.logger.record("xustom/min_online_error_change", online_error_change.min().item(), exclude="tensorboard")
                     self.logger.record("xustom/max_online_error_change", online_error_change.max().item(), exclude="tensorboard")
 
-                loss = F.smooth_l1_loss(current_q_values, target_q_values_ddqn, reduction="none") * online_error_change
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_dqn, reduction="none") * online_error_change
                 loss = loss.mean()
+
+            if self.target == "discard_OSR2_DQN":
+
+                oversampling_ratio = 2
+
+                replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size * oversampling_ratio, env=self._vec_normalize_env)
+                relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
+
+                # Get current Q-values estimates
+                current_q_values = self.q_net(replay_data.observations)
+                current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+
+                with th.no_grad():
+
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    all_next_q_values_offline = self.q_net_target(replay_data.next_observations)
+
+                    next_actions_online = all_next_q_values_online.argmax(dim=1, keepdim=True)
+                    next_actions_offline = all_next_q_values_offline.argmax(dim=1, keepdim=True)
+
+                    # Online Target
+                    next_q_values_online = all_next_q_values_online.gather(1, next_actions_online).reshape(-1, 1)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # DQN target
+                    next_q_values_dqn = all_next_q_values_offline.gather(1, next_actions_offline).reshape(-1, 1)
+                    target_q_values_dqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_dqn
+
+                    # ddqn_err = target_q_values_ddqn - current_q_values
+                    dqn_err = target_q_values_dqn - current_q_values
+                    online_err = target_q_values_online - current_q_values
+                    new_online_err = target_q_values_online - (current_q_values + dqn_err)
+                    online_error_change =  (th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err) + 1e-8)).detach()
+                    online_more_extreme = ( (dqn_err * online_err) > 0) & (th.abs(online_err) > th.abs(dqn_err))
+                    online_error_change = th.where(online_more_extreme, 1, online_error_change)
+
+                    _, batch_idxes = th.topk(online_error_change.squeeze(), k=batch_size)
+
+                    avg_ratio_before_discard = online_error_change.mean()
+                    average_ratio_after_discard = online_error_change[batch_idxes].mean()
+                    max_ratio_before_discard = online_error_change.max()
+                    max_ratio_after_discard = online_error_change[batch_idxes].max()
+
+                    self.logger.record("xustom/avg_ratio_before_discard", avg_ratio_before_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/average_ratio_after_discard", average_ratio_after_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/max_ratio_before_discard", max_ratio_before_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/lmax_ratio_after_discardoss", max_ratio_after_discard.item(), exclude="tensorboard")
+
+                loss = F.smooth_l1_loss(current_q_values[batch_idxes], target_q_values_dqn[batch_idxes])
+
+
+            if self.target == "discard_sample_OSR2_DQN":
+
+                oversampling_ratio = 2
+
+                replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size * oversampling_ratio, env=self._vec_normalize_env)
+                relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
+
+                # Get current Q-values estimates
+                current_q_values = self.q_net(replay_data.observations)
+                current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+
+                with th.no_grad():
+
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    all_next_q_values_offline = self.q_net_target(replay_data.next_observations)
+
+                    next_actions_online = all_next_q_values_online.argmax(dim=1, keepdim=True)
+                    next_actions_offline = all_next_q_values_offline.argmax(dim=1, keepdim=True)
+
+                    # Online Target
+                    next_q_values_online = all_next_q_values_online.gather(1, next_actions_online).reshape(-1, 1)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # DQN target
+                    next_q_values_dqn = all_next_q_values_offline.gather(1, next_actions_offline).reshape(-1, 1)
+                    target_q_values_dqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_dqn
+
+                    # ddqn_err = target_q_values_ddqn - current_q_values
+                    dqn_err = target_q_values_dqn - current_q_values
+                    online_err = target_q_values_online - current_q_values
+                    new_online_err = target_q_values_online - (current_q_values + dqn_err)
+                    online_error_change =  (th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err) + 1e-8)).detach()
+                    online_more_extreme = ( (dqn_err * online_err) > 0) & (th.abs(online_err) > th.abs(dqn_err))
+                    online_error_change = th.where(online_more_extreme, 1, online_error_change)
+
+                    batch_idxes = th.multinomial(online_error_change.squeeze(), batch_size, replacement=False)
+
+                    avg_ratio_before_discard = online_error_change.mean()
+                    average_ratio_after_discard = online_error_change[batch_idxes].mean()
+                    min_ratio_before_discard = online_error_change.min()
+                    min_ratio_after_discard = online_error_change[batch_idxes].min()
+
+                    self.logger.record("xustom/avg_ratio_before_discard", avg_ratio_before_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/avg_ratio_after_discard", average_ratio_after_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/min_ratio_before_discard", min_ratio_before_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/min_ratio_after_discard", min_ratio_after_discard.item(), exclude="tensorboard")
+
+                loss = F.smooth_l1_loss(current_q_values[batch_idxes], target_q_values_dqn[batch_idxes])
 
             if self.target == "discard_prop_sample_noOVER":
 
@@ -209,12 +310,50 @@ class RDQN(DQN):
                     max_ratio_after_discard = online_error_change[batch_idxes].max()
 
                     self.logger.record("xustom/avg_ratio_before_discard", avg_ratio_before_discard.item(), exclude="tensorboard")
-                    self.logger.record("xustom/average_ratio_after_discard", average_ratio_after_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/avg_ratio_after_discard", average_ratio_after_discard.item(), exclude="tensorboard")
                     self.logger.record("xustom/max_ratio_before_discard", max_ratio_before_discard.item(), exclude="tensorboard")
-                    self.logger.record("xustom/lmax_ratio_after_discardoss", max_ratio_after_discard.item(), exclude="tensorboard")
+                    self.logger.record("xustom/max_ratio_after_discard", max_ratio_after_discard.item(), exclude="tensorboard")
 
                 loss = F.smooth_l1_loss(current_q_values[batch_idxes], target_q_values_ddqn[batch_idxes])
 
+            if self.target == "loss_scale":
+
+                replay_data, sample_idxs, relative_episodic_position = self.replay_buffer.sample(batch_size, env=self._vec_normalize_env)
+                relative_episodic_position = th.from_numpy(relative_episodic_position).to(self.device).unsqueeze(1).float()
+
+                # Get current Q-values estimates
+                current_q_values = self.q_net(replay_data.observations)
+                current_q_values = th.gather(current_q_values, dim=1, index=replay_data.actions.long())
+
+                with th.no_grad():
+
+                    all_next_q_values_online = self.q_net(replay_data.next_observations)
+                    all_next_q_values_offline = self.q_net_target(replay_data.next_observations)
+
+                    next_actions_online = all_next_q_values_online.argmax(dim=1, keepdim=True)
+
+                    # Online Target
+                    next_q_values_online = all_next_q_values_online.gather(1, next_actions_online).reshape(-1, 1)
+                    target_q_values_online = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_online
+
+                    # DDQN target
+                    next_q_values_ddqn = all_next_q_values_offline.gather(1, next_actions_online).reshape(-1, 1)
+                    target_q_values_ddqn = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values_ddqn
+
+                    ddqn_err = target_q_values_ddqn - current_q_values
+                    online_err = target_q_values_online - current_q_values
+                    new_online_err = target_q_values_online - (current_q_values + ddqn_err)
+                    online_error_change =  (th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err) + 1e-8)).detach()
+
+                    # online_error_change /= online_error_change.mean()
+                    online_error_change = th.clamp(online_error_change * 2, max=1.) ** .2
+
+                    self.logger.record("xustom/avg_online_error_change", online_error_change.mean().item(), exclude="tensorboard")
+                    self.logger.record("xustom/min_online_error_change", online_error_change.min().item(), exclude="tensorboard")
+                    self.logger.record("xustom/max_online_error_change", online_error_change.max().item(), exclude="tensorboard")
+
+                loss = F.smooth_l1_loss(current_q_values, target_q_values_ddqn, reduction="none") * online_error_change
+                loss = loss.mean()
 
             if self.target == "discard_prop_sample":
 

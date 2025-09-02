@@ -15,20 +15,19 @@ online_err = target_q_values_online - current_q_values
 new_online_err = target_q_values_online - (current_q_values + ddqn_err)
 
 online_error_change =  th.abs(online_err) / (th.abs(online_err) + th.abs(new_online_err))
+online_more_extreme = ( (ddqn_err * online_err) > 0) & (th.abs(online_err) > th.abs(ddqn_err))
 
-print(f"{target_q_values_ddqn=}")
-print(f"{target_q_values_online=}")
+weight = th.where(online_more_extreme, 1, online_error_change)
+# print(f"{target_q_values_ddqn=}")
+# print(f"{target_q_values_online=}")
 print(f"{ddqn_err=}")
 print(f"{online_err=}")
 print(f"{new_online_err=}")
 print(f"{online_error_change=}")
+print(f"{weight=}")
 # print(f"{online_err_increase_raw=}") 
 
-print( (np.arange(10) / 10) ** .5) 
-
 # Learnings: DDQN-Error braucht 1e-8
-
-
 
 
 
