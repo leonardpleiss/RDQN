@@ -1,4 +1,5 @@
 20250902_Amidar_RDQN_discard,AmidarNoFrameskip-v4,PositionalReplayBuffer,RDQN,1,0
+20250902_Amidar_UNI_DQN,AmidarNoFrameskip-v4,ReplayBuffer,DQN,1,0
 20250902_KungFuMaster_RDQN_discard,KungFuMasterNoFrameskip-v4,PositionalReplayBuffer,RDQN,1,0
 20250902_KungFuMaster_UNI_DQN,KungFuMasterNoFrameskip-v4,ReplayBuffer,DQN,1,0
 20250902_BattleZone_RDQN_discard,BattleZoneNoFrameskip-v4,PositionalReplayBuffer,RDQN,1,0
