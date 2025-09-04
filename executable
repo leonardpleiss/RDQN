@@ -26,7 +26,7 @@ echo "A file written to logs/ by your program" > logs/other_log.txt
 echo "A file written to results/ by your program." > results/other_results_file.csv
 echo "Another file written to results/ by your program" > results/result1.csv
 
-python3 train_and_evaluate.py $1 $2 $3 $4 $5
+python3 train_and_evaluate.py $1 $2 $3 $4 $5 $6
 
 # Exit with a non 0 error code. This indicates that an error occured.
 exit 5

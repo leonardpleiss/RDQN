@@ -31,6 +31,7 @@ if __name__ == "__main__":
         sys.argv.append("DQN")
         sys.argv.append("5")
         sys.argv.append("0")
+        sys.argv.append("discard_OSR2_DQN")
 
     print(sys.argv)
 
@@ -42,13 +43,13 @@ if __name__ == "__main__":
         "MinAtar/SpaceInvaders-v1",
     ]
 
-    environment_names = minatar_envs #minatar_envs # [sys.argv[1]] #minatar_envs# ["MinAtar/SpaceInvaders-v1"] # [sys.argv[1]] #minatar_envs # [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
+    environment_names = [sys.argv[1]] #minatar_envs # [sys.argv[1]] #minatar_envs# ["MinAtar/SpaceInvaders-v1"] # [sys.argv[1]] #minatar_envs # [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
     model_names = [sys.argv[3]] #["RDQN", "RDQN"] #[sys.argv[3]] #"RDQN"] # [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
+    target = [sys.argv[6]]
 
-    targets = ["discard_OSR2_DQN"] #["discard_sample_OSR2_DQN", "discard_OSR2_DQN", "loss_scale_DQN", ""] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
     soft_update = False
 
     ##############################################################################################
@@ -59,8 +60,6 @@ if __name__ == "__main__":
         for iteration in range(starting_seed, iterations_per_env+starting_seed):
             for buffer_name in buffer_names:
                 for model_idx, model_name in enumerate(model_names):
-
-                    target = targets[model_idx]
 
                     if model_name in ["DDQN", "DQN"]:
                         buffer_name = "UNI"
