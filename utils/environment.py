@@ -298,14 +298,9 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         #                           momentum=0.95, # Set according to original DDQN for RL paper (van Hasselt, 2015)
         #                           centered=True))
 
-        # policy_kwargs = dict(
-        #     optimizer_class=optim.RMSprop,
-        #     optimizer_kwargs=dict(alpha=0.95, eps=0.01, momentum=0.0, centered=False)
-
         policy_kwargs = dict(
             optimizer_class=optim.RMSprop,
-            optimizer_kwargs=dict(alpha=0.95, eps=0.00001, momentum=0.0, centered=True),
-        )
+            optimizer_kwargs=dict(alpha=0.95, eps=0.01, momentum=0.0, centered=False))
 
         if model_name in ["DQN"]:
             print("DQN parameters loaded")
