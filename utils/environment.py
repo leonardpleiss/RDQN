@@ -15,6 +15,21 @@ import torch.optim as optim
 from stable_baselines3.dqn import DQN
 from stable_baselines3.dqn.ddqn import DDQN
 from stable_baselines3.dqn.rdqn import RDQN
+from stable_baselines3.common.torch_layers import MinAtarCNN
+
+class MinAtarObsWrapper(gym.ObservationWrapper):
+    """Convert MinAtar observations from (H, W, C) bool to (C, H, W) float32."""
+    def __init__(self, env):
+        super().__init__(env)
+        h, w, c = env.observation_space.shape
+        self.observation_space = gym.spaces.Box(
+            low=0.0, high=1.0,
+            shape=(c, h, w),  # channel-first
+            dtype=np.float32,
+        )
+
+    def observation(self, obs):
+        return obs.astype(np.float32).transpose(2, 0, 1)  # HWC → CHW
 
 atari_5 = [
     "NameThisGameNoFrameskip-v4",
@@ -92,7 +107,7 @@ def seed_everything(seed:int):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
-def get_environment_specific_settings(model_name, environment_name, n_envs:int=1, seed:int=0, use_sb3_standard_params=False):
+def get_environment_specific_settings(model_name, environment_name, n_envs:int=1, seed:int=0, soft_update:bool=False):
 
     assert n_envs == 1
 
@@ -130,99 +145,124 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
     progress_bar = True
     gamma = 0.99
     eval_exploration_fraction = .0
+    tau = 1.
 
     if environment_name.startswith("MinAtar/"):
 
+        env = make_vec_env(
+            environment_name,
+            n_envs=n_envs,
+            wrapper_class=MinAtarObsWrapper,
+        )
+
+        eval_env = make_vec_env(
+            environment_name,
+            n_envs=n_envs,
+            wrapper_class=MinAtarObsWrapper,
+        )
+
         num_timesteps = 2_000_000
-        learning_rate=2.3e-3
+        learning_rate=0.00025
         learning_starts = 1000
         reward_threshold = np.inf
         callback_on_new_best = None
         batch_size=32
         buffer_size=100000
-        learning_starts=1000
+        learning_starts=5000
         target_update_interval=1000
-        exploration_fraction=1_000_000/num_timesteps
+        exploration_fraction=100_000/num_timesteps
         exploration_final_eps=0.01
-        policy_kwargs=dict(net_arch=[256, 256])
+        dqn_policy="CnnPolicy"
         num_evals = 100
+
+        policy_kwargs = dict(
+            features_extractor_class = MinAtarCNN,
+            normalize_images = False,
+            optimizer_class=optim.RMSprop,
+            optimizer_kwargs=dict(alpha=0.95, eps=0.01, momentum=0.0, centered=False),
+        )
+
+    # if environment_name.startswith("MinAtar/"):
+
+    #     num_timesteps = 2_000_000
+    #     learning_rate=2.3e-3
+    #     learning_starts = 1000
+    #     reward_threshold = np.inf
+    #     callback_on_new_best = None
+    #     batch_size=32
+    #     buffer_size=100000
+    #     learning_starts=1000
+    #     target_update_interval=1000
+    #     exploration_fraction=1_000_000/num_timesteps
+    #     exploration_final_eps=0.01
+    #     policy_kwargs=dict(net_arch=[256, 256])
+    #     num_evals = 100
 
     elif environment_name == "CartPole-v1":
 
         num_timesteps = 50000
         learning_rate=2.3e-3
         learning_starts = 1000
-
-        if not use_sb3_standard_params:
-            
-            batch_size=64
-            buffer_size=100000
-            learning_starts=1000
-            target_update_interval=10
-            train_freq=256
-            gradient_steps=128
-            exploration_fraction=0.16
-            exploration_final_eps=0.04
-            policy_kwargs=dict(net_arch=[256, 256])
-            num_evals = 100
+        batch_size=64
+        buffer_size=100000
+        learning_starts=1000
+        target_update_interval=10
+        train_freq=256
+        gradient_steps=128
+        exploration_fraction=0.16
+        exploration_final_eps=0.04
+        policy_kwargs=dict(net_arch=[256, 256])
+        num_evals = 100
 
     elif environment_name == "LunarLander-v2":
 
         num_timesteps = 1e5
         learning_rate = 6.3e-4
         learning_starts = 1000
-
-        if not use_sb3_standard_params:
-            
-            batch_size = 128
-            buffer_size = 50000
-            learning_starts = 1000
-            target_update_interval = 250
-            train_freq = 4
-            gradient_steps = -1
-            exploration_fraction = 0.12
-            exploration_final_eps = 0.1
-            policy_kwargs = dict(net_arch=[256, 256])
-            num_evals = 100
-            n_eval_episodes = 1 # Delete later
+        batch_size = 128
+        buffer_size = 50000
+        learning_starts = 1000
+        target_update_interval = 250
+        train_freq = 4
+        gradient_steps = -1
+        exploration_fraction = 0.12
+        exploration_final_eps = 0.1
+        policy_kwargs = dict(net_arch=[256, 256])
+        num_evals = 100
+        n_eval_episodes = 1 # Delete later
 
     elif environment_name == "MountainCar-v0":
         
         num_timesteps = 1.2e5
         learning_rate = 4e-3
         learning_starts = 1000
-
-        if not use_sb3_standard_params:
-            batch_size = 128
-            buffer_size = 10000
-            learning_starts = 1000
-            gamma = 0.98
-            target_update_interval = 600
-            train_freq = 16
-            gradient_steps = 8
-            exploration_fraction = 0.2
-            exploration_final_eps = 0.07
-            policy_kwargs = dict(net_arch=[256, 256])
-            num_evals = 100
+        batch_size = 128
+        buffer_size = 10000
+        learning_starts = 1000
+        gamma = 0.98
+        target_update_interval = 600
+        train_freq = 16
+        gradient_steps = 8
+        exploration_fraction = 0.2
+        exploration_final_eps = 0.07
+        policy_kwargs = dict(net_arch=[256, 256])
+        num_evals = 100
 
     elif environment_name == "Acrobot-v1":
 
         num_timesteps = 1e5
         learning_rate = 6.3e-4
         learning_starts = 1000
-
-        if not use_sb3_standard_params:
-
-            batch_size = 128
-            buffer_size = 50000
-            learning_starts = 1000
-            target_update_interval = 250
-            train_freq = 4
-            gradient_steps = -1
-            exploration_fraction = 0.12
-            exploration_final_eps: 0.1
-            policy_kwargs = dict(net_arch=[256, 256])
-            num_evals = 100
+        batch_size = 128
+        buffer_size = 50000
+        learning_starts = 1000
+        target_update_interval = 250
+        train_freq = 4
+        gradient_steps = -1
+        exploration_fraction = 0.12
+        exploration_final_eps: 0.1
+        policy_kwargs = dict(net_arch=[256, 256])
+        num_evals = 100
 
     # Overwrite standard settings if needed & specify env-specific parameters
     elif environment_name in all_atari_games:
@@ -258,10 +298,15 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
         #                           momentum=0.95, # Set according to original DDQN for RL paper (van Hasselt, 2015)
         #                           centered=True))
 
+        # policy_kwargs = dict(
+        #     optimizer_class=optim.RMSprop,
+        #     optimizer_kwargs=dict(alpha=0.95, eps=0.01, momentum=0.0, centered=False)
+
         policy_kwargs = dict(
             optimizer_class=optim.RMSprop,
-            optimizer_kwargs=dict(alpha=0.95, eps=0.01, momentum=0.0, centered=False),
-)
+            optimizer_kwargs=dict(alpha=0.95, eps=0.00001, momentum=0.0, centered=True),
+        )
+
         if model_name in ["DQN"]:
             print("DQN parameters loaded")
             exploration_final_eps=.1 # Set according to DDQN paper (van Hasselt, 2015 not mentioned in PER. 
@@ -313,7 +358,11 @@ def get_environment_specific_settings(model_name, environment_name, n_envs:int=1
 
     print(f"{reward_threshold, learning_starts, batch_size=}")
 
+    if soft_update:
+        tau = 1 / target_update_interval
+        target_update_interval = 1
+
 
     return  model_class, env, eval_env, dqn_policy, num_timesteps, reward_threshold, num_evals, callback_on_new_best, learning_rate, \
             learning_starts, n_eval_episodes, exploration_initial_eps, exploration_fraction, exploration_final_eps, batch_size, buffer_size, \
-            policy_kwargs, max_grad_norm, train_freq, target_update_interval, gradient_steps, gamma, eval_exploration_fraction, progress_bar
+            policy_kwargs, max_grad_norm, train_freq, target_update_interval, gradient_steps, gamma, eval_exploration_fraction, tau, progress_bar

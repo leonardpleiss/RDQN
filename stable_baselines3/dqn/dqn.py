@@ -13,7 +13,7 @@ from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
 from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update
-from stable_baselines3.dqn.policies import CnnPolicy, DQNPolicy, MlpPolicy, MultiInputPolicy, QNetwork
+from stable_baselines3.dqn.policies import CnnPolicy, DQNPolicy, MlpPolicy, MultiInputPolicy, QNetwork, MinAtarCNN
 from stable_baselines3.common.buffers_custom_v9 import SelectiveReplayBuffer
 
 SelfDQN = TypeVar("SelfDQN", bound="DQN")
@@ -140,6 +140,8 @@ class DQN(OffPolicyAlgorithm):
         self.max_grad_norm = max_grad_norm
         # "epsilon" for the epsilon-greedy exploration
         self.exploration_rate = 0.0
+        print(policy)
+        print(policy_kwargs)
 
         if _init_setup_model:
             self._setup_model()
@@ -164,7 +166,6 @@ class DQN(OffPolicyAlgorithm):
                     "therefore the target network will be updated after each call to env.step() "
                     f"which corresponds to {self.n_envs} steps."
                 )
-
     def _create_aliases(self) -> None:
         self.q_net = self.policy.q_net
         self.q_net_target = self.policy.q_net_target
@@ -175,18 +176,7 @@ class DQN(OffPolicyAlgorithm):
         This method is called in ``collect_rollouts()`` after each step in the environment.
         """
         self._n_calls += 1
-        # Account for multiple environments
-        # each call to step() corresponds to n_envs transitions
 
-        # if self.replay_buffer_class.__name__ == "SelectiveReplayBuffer":
-        #     if self.replay_buffer.force_update == True:
-        #         polyak_update(self.q_net.parameters(), self.q_net_target.parameters(), self.tau)
-        #         # Copy running stats, see GH issue #996
-        #         polyak_update(self.batch_norm_stats, self.batch_norm_stats_target, 1.0)
-
-        #         self.replay_buffer.force_update = False
-        #         # print("updated target")
-        # else:
         if self._n_calls % max(self.target_update_interval // self.n_envs, 1) == 0:
             polyak_update(self.q_net.parameters(), self.q_net_target.parameters(), self.tau)
             # Copy running stats, see GH issue #996

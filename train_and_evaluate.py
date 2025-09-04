@@ -17,7 +17,7 @@ if __name__ == "__main__":
     profile = False
     device = "cuda"
     n_envs = 1
-    trial_name = "0109_FULLRUN_v4"
+    trial_name = "0309_ALIGNMENT"
     use_sb3_standard_params = False
 
     # ---------------------------------- # Trial Settings # ---------------------------------- #
@@ -28,27 +28,28 @@ if __name__ == "__main__":
 
         sys.argv.append("MinAtar/Breakout-v1") # ['NameThisGameNoFrameskip-v4', 'QbertNoFrameskip-v4', 'BattleZoneNoFrameskip-v4', 'DoubleDunkNoFrameskip-v4', 'PhoenixNoFrameskip-v4']")
         sys.argv.append("PositionalReplayBuffer")
-        sys.argv.append("RDQN")
-        sys.argv.append("3")
+        sys.argv.append("DQN")
+        sys.argv.append("5")
         sys.argv.append("0")
 
     print(sys.argv)
 
     minatar_envs = [
+        "MinAtar/Asterix-v1",
         "MinAtar/Breakout-v1",
         "MinAtar/Freeway-v1",
         # "MinAtar/Seaquest-v1", # Takes forever
         "MinAtar/SpaceInvaders-v1",
-        # "MinAtar/Asterix-v1", # Agent doesnt learn effectively
     ]
 
-    environment_names = [sys.argv[1]] #minatar_envs # [sys.argv[1]] #minatar_envs# ["MinAtar/SpaceInvaders-v1"] # [sys.argv[1]] #minatar_envs # [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
+    environment_names = minatar_envs #minatar_envs # [sys.argv[1]] #minatar_envs# ["MinAtar/SpaceInvaders-v1"] # [sys.argv[1]] #minatar_envs # [sys.argv[1]] # minatar_envs # [sys.argv[1]] #minatar_envs #["MinAtar/Breakout-v1"] # ["LunarLander-v2", "CartPole-v1", "Acrobot-v1"]
     buffer_names = [sys.argv[2]] #["SelectiveReplayBuffer_02", "SelectiveReplayBuffer_04", "SelectiveReplayBuffer_06", "SelectiveReplayBuffer_08"] #[sys.argv[2]] # "R_UNI_a10"] #, "R_UNI_a8", "R_UNI_a6", "R_UNI_a4", "R_UNI_a2"] 
-    model_names = [sys.argv[3]] #"RDQN"] # [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
+    model_names = [sys.argv[3]] #["RDQN", "RDQN"] #[sys.argv[3]] #"RDQN"] # [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
 
-    targets = ["discard_OSR2_DQN_errscaled"] #["discard_sample_OSR2_DQN", "discard_OSR2_DQN", "loss_scale_DQN", ""] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
+    targets = ["discard_OSR2_DQN"] #["discard_sample_OSR2_DQN", "discard_OSR2_DQN", "loss_scale_DQN", ""] # ["loss_scale", "discard_prop_sample", "discard_prop_v2", ""]
+    soft_update = False
 
     ##############################################################################################
      
@@ -82,8 +83,8 @@ if __name__ == "__main__":
                     callback_on_new_best, learning_rate, learning_starts, n_eval_episodes, \
                     exploration_initial_eps, exploration_fraction, exploration_final_eps, \
                     batch_size, buffer_size, policy_kwargs, max_grad_norm, train_freq, \
-                    target_update_interval, gradient_steps, gamma, eval_exploration_fraction, progress_bar = \
-                    get_environment_specific_settings(model_name, environment_name, n_envs=n_envs, seed=iteration, use_sb3_standard_params=use_sb3_standard_params)
+                    target_update_interval, gradient_steps, gamma, eval_exploration_fraction, tau, progress_bar = \
+                    get_environment_specific_settings(model_name, environment_name, n_envs=n_envs, seed=iteration, soft_update=soft_update)
 
                     export_suffix += f"_{batch_size}bs_{iteration}seed_{int(num_evals)}evalfreq_{n_envs}"
 
@@ -113,6 +114,7 @@ if __name__ == "__main__":
                         target_update_interval=target_update_interval,
                         gradient_steps=gradient_steps,
                         gamma=gamma,
+                        tau=tau,
 
                         # Tensorboard settings
                         tensorboard_log = tb_log_path + export_suffix + "/",

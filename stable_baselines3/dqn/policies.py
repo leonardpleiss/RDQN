@@ -10,6 +10,7 @@ from stable_baselines3.common.torch_layers import (
     CombinedExtractor,
     FlattenExtractor,
     NatureCNN,
+    MinAtarCNN,
     create_mlp,
 )
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
@@ -132,7 +133,7 @@ class DQNPolicy(BasePolicy):
         )
 
         if net_arch is None:
-            if features_extractor_class == NatureCNN:
+            if features_extractor_class in [NatureCNN, MinAtarCNN]:
                 net_arch = []
             else:
                 net_arch = [64, 64]
@@ -257,7 +258,8 @@ class CnnPolicy(DQNPolicy):
             optimizer_class,
             optimizer_kwargs,
         )
-
+        
+        print(features_extractor_class)
 
 class MultiInputPolicy(DQNPolicy):
     """
