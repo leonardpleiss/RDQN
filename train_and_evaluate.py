@@ -48,7 +48,7 @@ if __name__ == "__main__":
     model_names = [sys.argv[3]] #["RDQN", "RDQN"] #[sys.argv[3]] #"RDQN"] # [sys.argv[3]] # ["RDQN", "RDQN", "RDQN", "DDQN"] # [sys.argv[3]]
     iterations_per_env = int(sys.argv[4])
     starting_seed = int(sys.argv[5])
-    target = [sys.argv[6]]
+    target = sys.argv[6]
 
     soft_update = False
 
